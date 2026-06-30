@@ -1,0 +1,6 @@
+{
+  "name": "Page Free",
+  "description": "Aplikasi berbasis web pembuat desain produk percetakan seperti kartu nama dan sampul rapor dengan bantuan rekomendasi AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
