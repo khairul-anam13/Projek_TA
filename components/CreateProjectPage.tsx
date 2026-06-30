@@ -1,17 +1,18 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, ArrowLeft, Printer, ChevronRight, HelpCircle } from "lucide-react";
+import { Sparkles, ArrowLeft, BookOpen, ChevronRight, HelpCircle } from "lucide-react";
+import { ProductType } from "../lib/types";
 
 interface CreateProjectPageProps {
-  initialProductType: "Kartu Nama" | "Sampul Rapor";
+  initialProductType: ProductType;
   onBack: () => void;
   onGenerateAi: (formData: {
     name: string;
     category: string;
     audience: string;
     concept: string;
-    productType: "Kartu Nama" | "Sampul Rapor";
+    productType: ProductType;
   }) => void;
 }
 
@@ -44,7 +45,8 @@ export default function CreateProjectPage({
   const [category, setCategory] = useState("");
   const [audience, setAudience] = useState("");
   const [concept, setConcept] = useState(CONCEPT_SUGGESTIONS[0]);
-  const [productType, setProductType] = useState<"Kartu Nama" | "Sampul Rapor">(initialProductType);
+  // Untuk saat ini hanya Sampul Rapor yang tersedia
+  const productType: ProductType = "Sampul Rapor";
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -148,8 +150,8 @@ export default function CreateProjectPage({
           </button>
           
           <div className="flex items-center gap-1.5">
-            <Printer className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-extrabold tracking-tight">Page Free</span>
+            <BookOpen className="w-4 h-4 text-teal-600" />
+            <span className="text-xs font-extrabold tracking-tight">PageFree</span>
           </div>
         </div>
       </header>
@@ -157,16 +159,20 @@ export default function CreateProjectPage({
       {/* Main Form container */}
       <main className="max-w-2xl w-full mx-auto px-4 py-10 flex-grow">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-10">
-          <div className="mb-8 text-center sm:text-left">
-            <div className="inline-flex p-3 bg-blue-50 text-blue-600 rounded-2xl mb-4">
-              <Sparkles className="w-6 h-6" />
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-teal-50 text-teal-600 rounded-xl">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-stone-900">
+                  Buat Sampul Rapor Baru
+                </h1>
+                <p className="text-stone-500 text-xs mt-0.5">
+                  AI akan merekomendasikan desain terbaik berdasarkan informasi sekolah Anda.
+                </p>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-slate-950 tracking-tight font-display-space">
-              Rancang Menggunakan Asisten AI
-            </h1>
-            <p className="text-slate-500 text-sm mt-1.5">
-              Masukkan deskripsi usaha atau institusi Anda. Gemini AI akan meracik palet warna cetak, slogan kampanye, nama font artistik, dan layout standar percetakan.
-            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6" id="ai-generator-form">
@@ -176,73 +182,42 @@ export default function CreateProjectPage({
               </div>
             )}
 
-            {/* Select Product Type */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                Jenis Produk Percetakan
-              </label>
-              <div className="grid grid-cols-2 gap-3" id="product-type-grid">
-                <button
-                  type="button"
-                  onClick={() => setProductType("Kartu Nama")}
-                  className={`p-4 rounded-xl border text-left flex flex-col justify-between h-24 cursor-pointer transition ${
-                    productType === "Kartu Nama"
-                      ? "border-blue-600 ring-4 ring-blue-50 bg-blue-50/10 text-slate-900"
-                      : "border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${productType === "Kartu Nama" ? "bg-blue-600 animate-pulse" : "bg-slate-300"}`} />
-                  <div>
-                    <span className="block text-xs font-bold text-slate-900">Kartu Nama</span>
-                    <span className="block text-[10px] text-slate-400 mt-0.5">Ukuran Standar 90x55mm</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setProductType("Sampul Rapor")}
-                  className={`p-4 rounded-xl border text-left flex flex-col justify-between h-24 cursor-pointer transition ${
-                    productType === "Sampul Rapor"
-                      ? "border-blue-600 ring-4 ring-blue-50 bg-blue-50/10 text-slate-900"
-                      : "border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${productType === "Sampul Rapor" ? "bg-blue-600 animate-pulse" : "bg-slate-300"}`} />
-                  <div>
-                    <span className="block text-xs font-bold text-slate-900">Sampul Rapor</span>
-                    <span className="block text-[10px] text-slate-400 mt-0.5">Ukuran Standar A4 / F4</span>
-                  </div>
-                </button>
+            {/* Hanya Sampul Rapor — indikator jenis produk */}
+            <div className="flex items-center gap-3 p-3.5 bg-teal-50 border border-teal-100 rounded-xl">
+              <span className="text-xl" role="img" aria-label="Sampul Rapor">📄</span>
+              <div>
+                <span className="block text-xs font-bold text-teal-800">Sampul Rapor</span>
+                <span className="text-[10px] text-teal-600">Ukuran Standar A4 (210 × 297 mm)</span>
               </div>
             </div>
 
-            {/* Nama Usaha / Sekolah */}
+            {/* Nama Sekolah */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5" htmlFor="field-name">
-                Nama Usaha / Sekolah / Brand
+              <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1.5" htmlFor="field-name">
+                Nama Sekolah / Instansi
               </label>
               <input
                 id="field-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={productType === "Kartu Nama" ? "Contoh: PT AeroSpace Solusindo" : "Contoh: SMK Negeri 1 Yogyakarta"}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-blue-500 transition-all text-slate-900 font-semibold"
+                placeholder="Contoh: SMA Negeri 1 Yogyakarta"
+                className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm outline-none focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition-all text-stone-900 font-semibold"
                 required
               />
             </div>
 
-            {/* Kategori Usaha */}
+            {/* Kategori Sekolah */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                Kategori Bisnis / Sekolah
+              <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">
+                Jenjang / Bidang Sekolah
               </label>
               <input
                 type="text"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="Contoh: Kedai Kopi Modern, Sekolah Menengah Kejuruan"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-blue-500 transition-all text-slate-900 font-semibold mb-2"
+                placeholder="Contoh: SMA, SMK Jurusan RPL, SMP Negeri"
+                className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm outline-none focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition-all text-stone-900 font-semibold mb-2"
                 required
               />
               {/* Category Quick Suggestions */}
@@ -252,7 +227,7 @@ export default function CreateProjectPage({
                     key={catString}
                     type="button"
                     onClick={() => setCategory(catString)}
-                    className="px-2.5 py-1 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition cursor-pointer"
+                    className="px-2.5 py-1 text-[10px] font-bold bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-full transition cursor-pointer"
                   >
                     {catString}
                   </button>
@@ -263,10 +238,10 @@ export default function CreateProjectPage({
             {/* Target Konsumen */}
             <div>
               <div className="flex items-center gap-1.5 mb-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500" htmlFor="field-audience">
-                  Target Konsumen / Pembaca
+                <label className="block text-xs font-bold uppercase tracking-wider text-stone-500" htmlFor="field-audience">
+                  Nama Siswa / Kelas (Opsional)
                 </label>
-                <span className="text-slate-300 cursor-help" title="Membantu menyelaraskan psikologi warna dan pemilihan font display.">
+                <span className="text-stone-300 cursor-help" title="Opsional: digunakan untuk melengkapi isi desain secara otomatis.">
                   <HelpCircle className="w-3.5 h-3.5" />
                 </span>
               </div>
@@ -275,8 +250,8 @@ export default function CreateProjectPage({
                 type="text"
                 value={audience}
                 onChange={(e) => setAudience(e.target.value)}
-                placeholder="Contoh: Pemuda 20-30 thn, Profesional B2B, Siswa & Orang Tua"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-blue-500 transition-all text-slate-900 font-medium"
+                placeholder="Contoh: Siswa kelas XI, Tahun Pelajaran 2025/2026"
+                className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm outline-none focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition-all text-stone-900 font-medium"
               />
             </div>
 
@@ -304,17 +279,16 @@ export default function CreateProjectPage({
             </div>
 
             {/* Submit Action Block */}
-            <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <span className="text-[11px] text-slate-400 font-medium text-center sm:text-left">
-                Proses resep rekomendasi AI memakan waktu ±5 detik.
+            <div className="pt-4 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <span className="text-[11px] text-stone-400 font-medium">
+                Proses AI ±5 detik.
               </span>
-              
               <button
                 type="submit"
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-xl text-sm shadow-md flex items-center justify-center gap-2 cursor-pointer transform transition active:scale-95"
+                className="px-6 py-3 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transform transition active:scale-95"
               >
                 <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>Mulai Rekomendasi Gemini AI</span>
+                <span>Buat dengan AI</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

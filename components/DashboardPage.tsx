@@ -1,29 +1,29 @@
 "use client";
 
 import React, { useState } from "react";
-import { DesignProject } from "../lib/types";
+import { DesignProject, ProductType, PRODUCT_CATALOG } from "../lib/types";
 import {
   Plus,
   Sparkles,
   Layers,
-  Download,
-  FolderOpen,
   Trash2,
   Edit,
   Clock,
-  Printer,
+  BookOpen,
   FileCheck,
   Search,
-  BookOpen,
-  CreditCard,
-  ExternalLink,
-  ChevronRight
+  LogOut,
+  ChevronRight,
+  Eye,
 } from "lucide-react";
+import { motion } from "motion/react";
 
 interface DashboardPageProps {
   userEmail: string;
+  userName?: string;
+  avatarUrl?: string;
   projects: DesignProject[];
-  onCreateProject: (productType: "Kartu Nama" | "Sampul Rapor") => void;
+  onCreateProject: (productType: ProductType) => void;
   onEditProject: (project: DesignProject) => void;
   onPreviewProject: (project: DesignProject) => void;
   onDeleteProject: (id: string) => void;
@@ -33,6 +33,8 @@ interface DashboardPageProps {
 
 export default function DashboardPage({
   userEmail,
+  userName,
+  avatarUrl,
   projects,
   onCreateProject,
   onEditProject,
@@ -43,313 +45,280 @@ export default function DashboardPage({
 }: DashboardPageProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredProjects = projects.filter((project) =>
-    project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.category.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredProjects = projects.filter(
+    (project) =>
+      project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Stats Counters
-  const totalDesigns = projects.length;
-  const totalDraft = projects.filter((p) => p.status === "Draft").length;
+  const displayName = userName ? userName.split(" ")[0] : userEmail.split("@")[0];
   const totalFinal = projects.filter((p) => p.status === "Final" || p.status === "Selesai").length;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col" id="dashboard-wrapper">
-      {/* SaaS Dashboard Navigation bar */}
-      <header className="bg-white border-b border-slate-200/85 sticky top-0 z-40" id="dash-navbar">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-xl text-white">
-              <Printer className="w-5 h-5" />
+    <div className="min-h-screen bg-stone-50 flex flex-col" id="dashboard-wrapper">
+
+      {/* Navbar */}
+      <header className="bg-white border-b border-stone-200/80 sticky top-0 z-40" id="dash-navbar">
+        <div className="max-w-5xl mx-auto px-5 h-16 flex items-center justify-between">
+          {/* Brand */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center">
+              <BookOpen className="w-4 h-4 text-white" />
             </div>
-            <div>
-              <span className="font-extrabold text-lg tracking-tight text-slate-900">
-                Page <span className="text-blue-600">Free</span>
-              </span>
-              <span className="hidden sm:inline-block ml-2 text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-mono font-bold uppercase">
-                Enterprise Demo
-              </span>
-            </div>
+            <span className="font-bold text-base text-stone-900 tracking-tight">
+              Page<span className="text-teal-600">Free</span>
+            </span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden md:block">
-              <p className="text-xs text-slate-400 font-mono">Logged in as</p>
-              <p className="text-sm font-semibold text-slate-800">{userEmail}</p>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border border-blue-200">
-              {userEmail.charAt(0).toUpperCase()}
+          {/* User Controls */}
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2.5">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={displayName}
+                  className="w-8 h-8 rounded-full border border-stone-200 object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-sm border border-teal-200">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="text-sm text-stone-700 font-medium">{displayName}</span>
             </div>
             <button
               onClick={onLogout}
-              className="text-xs bg-slate-100 hover:bg-slate-200 font-semibold px-3 py-1.5 rounded-lg text-slate-600 cursor-pointer"
+              className="flex items-center gap-1.5 text-xs font-medium text-stone-500 hover:text-stone-800 px-3 py-1.5 rounded-lg hover:bg-stone-100 transition cursor-pointer"
+              title="Keluar"
             >
-              Sign Out
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Keluar</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main SaaS Dashboard stage */}
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
-        {/* Top welcome banner */}
-        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4" id="welcome-banner">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-950 font-display-space tracking-tight">
-              Selamat Datang, {userEmail.split("@")[0]}!
-            </h1>
-            <p className="text-slate-500 text-sm mt-1">
-              Ide Anda siap dicetak. Mulai proyek baru dengan AI atau kembangkan karya yang sudah disimpan.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => onCreateProject("Kartu Nama")}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold rounded-xl shadow-md shadow-blue-100 flex items-center gap-1.5 cursor-pointer transform transition active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Kartu Nama Baru</span>
-            </button>
-            <button
-              onClick={() => onCreateProject("Sampul Rapor")}
-              className="px-4 py-2.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transform transition active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Sampul Rapor Baru</span>
-            </button>
-          </div>
+      <main className="max-w-5xl w-full mx-auto px-5 py-8 flex-grow space-y-8">
+
+        {/* Welcome */}
+        <div>
+          <h1 className="text-2xl font-bold text-stone-900">
+            Halo, {displayName} 👋
+          </h1>
+          <p className="text-stone-500 text-sm mt-1">
+            Apa yang ingin Anda buat hari ini?
+          </p>
         </div>
 
-        {/* 3 Grid Statistics Indicators */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8" id="stats-grid">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Desain Saya</span>
-              <span className="text-3xl font-extrabold text-slate-900 mt-1 block">{totalDesigns}</span>
-              <span className="text-slate-400 text-xs mt-1 block">Tersimpan di enkripsi local</span>
-            </div>
-            <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl">
-              <Layers className="w-6 h-6" />
-            </div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Desain Final/Export</span>
-              <span className="text-3xl font-extrabold text-emerald-600 mt-1 block">{totalFinal}</span>
-              <span className="text-slate-400 text-xs mt-1 block">Siap kirim ke mesin cetak</span>
-            </div>
-            <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl">
-              <FileCheck className="w-6 h-6" />
-            </div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-            <div>
-              <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Template Percetakan</span>
-              <span className="text-3xl font-extrabold text-amber-500 mt-1 block">3 Pilihan</span>
-              <span className="text-slate-400 text-xs mt-1 block">Pra-desain profesional aktif</span>
-            </div>
-            <div className="p-3.5 bg-amber-50 text-amber-500 rounded-2xl">
-              <Clock className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Launchpad Buttons */}
-        <div className="bg-gradient-to-tr from-blue-700 to-indigo-800 rounded-2xl p-6 text-white mb-8 shadow-lg shadow-blue-100" id="quick-action-strip">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div>
-              <span className="text-xs bg-white/20 px-2.5 py-1 rounded-full font-semibold inline-block mb-2">Panduan AI Kreatif</span>
-              <h2 className="text-xl font-bold tracking-tight">Butuh inspirasi desain kilat untuk usaha atau sekolah?</h2>
-              <p className="text-blue-100 text-xs mt-1 max-w-xl">
-                Isi form dan serahkan ke rekomendasi visual Gemini AI. Dapatkan konsep warna terpadu, logo yang elegan, tagline promosi, dan font yang serasi.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 w-full md:w-auto shrink-0 justify-end">
-              <button
-                onClick={() => onCreateProject("Kartu Nama")}
-                className="w-full md:w-auto px-5 py-3 bg-white text-blue-700 hover:bg-slate-50 active:bg-slate-100 font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
+        {/* ── PRODUCT CATALOG SECTION ─────────────────────────────────── */}
+        <section id="product-catalog-section">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-stone-400 mb-4">
+            Pilih Jenis Desain
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {PRODUCT_CATALOG.map((product) => (
+              <motion.button
+                key={product.type}
+                id={`product-card-${product.type.replace(/\s+/g, "-").toLowerCase()}`}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => product.available && onCreateProject(product.type)}
+                disabled={!product.available}
+                className={`text-left p-5 rounded-2xl border-2 transition-all cursor-pointer group
+                  ${product.available
+                    ? "border-stone-200 bg-white hover:border-teal-400 hover:shadow-md hover:shadow-teal-50"
+                    : "border-stone-100 bg-stone-50 opacity-50 cursor-not-allowed"
+                  }`}
               >
-                <CreditCard className="w-4 h-4 text-blue-600" />
-                <span>Buat Kartu Nama Pintar</span>
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </button>
-              <button
-                onClick={() => onCreateProject("Sampul Rapor")}
-                className="w-full md:w-auto px-5 py-3 bg-blue-600 border border-blue-400/50 hover:bg-blue-500 active:bg-blue-700 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
-              >
-                <BookOpen className="w-4 h-4 text-blue-100" />
-                <span>Buat Sampul Rapor</span>
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </button>
-            </div>
+                <div className="flex items-start justify-between mb-4">
+                  <span className="text-3xl" role="img" aria-label={product.label}>
+                    {product.icon}
+                  </span>
+                  {product.available ? (
+                    <div className="flex items-center gap-1 bg-teal-50 text-teal-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-teal-100">
+                      <span className="w-1.5 h-1.5 bg-teal-500 rounded-full" />
+                      Tersedia
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-stone-400 font-medium">Segera Hadir</span>
+                  )}
+                </div>
+                <h3 className="font-bold text-stone-900 text-sm mb-1 group-hover:text-teal-700 transition-colors">
+                  {product.label}
+                </h3>
+                <p className="text-xs text-stone-500 leading-relaxed mb-3">
+                  {product.description}
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-stone-400 font-mono bg-stone-100 px-2 py-0.5 rounded-full">
+                    {product.dimension}
+                  </span>
+                  {product.available && (
+                    <div className="flex items-center gap-1 text-xs text-teal-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Buat Baru</span>
+                    </div>
+                  )}
+                </div>
+              </motion.button>
+            ))}
           </div>
-        </div>
+        </section>
 
-        {/* Recent project search & card section */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6" id="projects-section">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <FolderOpen className="w-5 h-5 text-slate-500" />
-                <span>Riwayat Proyek Terbaru</span>
-              </h3>
-              <p className="text-slate-400 text-xs font-medium">Buka kembali desain tersimpan untuk diedit atau diexport</p>
-            </div>
-
-            <div className="relative max-w-xs w-full" id="search-container">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                <Search className="w-4 h-4" />
-              </span>
+        {/* ── PROJECTS LIST ───────────────────────────────────────────── */}
+        <section id="projects-section">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-stone-400">
+              Desain Tersimpan ({projects.length})
+            </h2>
+            <div className="relative max-w-xs w-full sm:w-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Cari nama desain / bidang..."
-                className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:bg-white focus:border-blue-500 outline-none transition-all"
+                placeholder="Cari desain..."
+                className="w-full pl-8 pr-4 py-2 bg-white border border-stone-200 rounded-xl text-xs text-stone-700 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all"
               />
             </div>
           </div>
 
           {filteredProjects.length === 0 ? (
-            <div className="text-center py-16 border-2 border-dashed border-slate-100 rounded-2xl" id="empty-state">
-              <Layers className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-sm font-semibold text-slate-700">Belum ada desain tersimpan</p>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto mt-1">
-                Ketikkan kata pencarian lain atau mulai proyek baru Anda dengan mengeklik tombol di atas.
+            <div className="text-center py-16 bg-white rounded-2xl border-2 border-dashed border-stone-200" id="empty-state">
+              <Layers className="w-10 h-10 text-stone-300 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-stone-600">
+                {projects.length === 0 ? "Belum ada desain" : "Tidak ditemukan"}
               </p>
-              <div className="mt-4 flex justify-center gap-2.5">
-                <button
-                  onClick={() => onCreateProject("Kartu Nama")}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-blue-600 rounded-xl cursor-pointer"
-                >
-                  Buat Kartu Nama Pertama
-                </button>
-              </div>
+              <p className="text-xs text-stone-400 mt-1">
+                {projects.length === 0
+                  ? "Pilih jenis desain di atas untuk memulai."
+                  : "Coba kata pencarian lain."}
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="projects-history-grid">
-              {filteredProjects.map((project) => (
-                <div
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="projects-grid">
+              {filteredProjects.map((project, i) => (
+                <motion.div
                   key={project.id}
-                  className="group relative bg-white border border-slate-200/80 rounded-2xl hover:border-blue-300 p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="group bg-white border border-stone-200 rounded-2xl hover:border-stone-300 hover:shadow-md transition-all flex flex-col"
                   id={`project-card-${project.id}`}
                 >
-                  <div>
-                    {/* Badge product type */}
-                    <div className="flex justify-between items-start gap-2 mb-3">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${
-                        project.productType === "Kartu Nama"
-                          ? "bg-blue-50 text-blue-700"
-                          : "bg-teal-50 text-teal-700"
-                      }`}>
-                        {project.productType}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold ${
-                        project.status === "Final" || project.status === "Selesai"
-                          ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                          : "bg-amber-50 text-amber-600 border border-amber-100"
-                      }`}>
+                  {/* Mini canvas preview */}
+                  <div
+                    className="h-28 rounded-t-2xl relative overflow-hidden flex items-center justify-center"
+                    style={{ backgroundColor: project.backgroundColor || "#f8f7f4" }}
+                  >
+                    <div className="text-center px-3">
+                      <p
+                        className="text-[10px] font-extrabold uppercase tracking-wide line-clamp-1"
+                        style={{
+                          color:
+                            project.backgroundColor === "#FFFFFF" ||
+                            project.backgroundColor === "#FDFCFA"
+                              ? "#1C1917"
+                              : "#FFFFFF",
+                          fontFamily: project.typography?.title || "sans-serif",
+                        }}
+                      >
+                        {project.name}
+                      </p>
+                      <p
+                        className="text-[7px] mt-0.5 line-clamp-1 italic"
+                        style={{
+                          color:
+                            project.backgroundColor === "#FFFFFF" ||
+                            project.backgroundColor === "#FDFCFA"
+                              ? "#78716C"
+                              : "#D6D3D1",
+                          fontFamily: project.typography?.body || "sans-serif",
+                        }}
+                      >
+                        {project.slogan || "Desain Sampul Rapor"}
+                      </p>
+                    </div>
+
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-stone-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => onEditProject(project)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-stone-900 rounded-lg text-[11px] font-bold cursor-pointer hover:bg-stone-100 transition"
+                        title="Edit"
+                      >
+                        <Edit className="w-3 h-3" /> Edit
+                      </button>
+                      <button
+                        onClick={() => onPreviewProject(project)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg text-[11px] font-bold cursor-pointer hover:bg-teal-700 transition"
+                        title="Pratinjau"
+                      >
+                        <Eye className="w-3 h-3" /> Lihat
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card info */}
+                  <div className="p-4 flex flex-col gap-2 flex-grow">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="text-sm font-bold text-stone-900 line-clamp-1 flex-1">
+                        {project.name}
+                      </h4>
+                      <span
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          project.status === "Final" || project.status === "Selesai"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                            : "bg-amber-50 text-amber-600 border border-amber-100"
+                        }`}
+                      >
                         {project.status}
                       </span>
                     </div>
+                    <p className="text-[11px] text-stone-400">{project.category}</p>
 
-                    <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 block line-clamp-1">
-                      {project.name}
-                    </h4>
-
-                    {/* Metadata tags */}
-                    <div className="mt-2 text-[11px] text-slate-400 space-y-1">
-                      <p>Kategori: <strong className="text-slate-600">{project.category}</strong></p>
-                      <p>Konsep: <strong className="text-slate-600">{project.concept}</strong></p>
-                    </div>
-
-                    {/* Mini Visual Preview Block box with background */}
-                    <div
-                      className="mt-4 h-24 rounded-xl relative overflow-hidden flex items-center justify-center shadow-inner border border-slate-100"
-                      style={{ backgroundColor: project.backgroundColor || "#ffffff" }}
-                    >
-                      <div className="text-center p-2 opacity-80 scale-90">
-                        <p
-                          className="text-[10px] font-extrabold uppercase tracking-wide line-clamp-1"
-                          style={{
-                            color: project.backgroundColor === "#FFFFFF" || project.backgroundColor === "#FDFCFA" ? "#1E293B" : "#FFFFFF",
-                            fontFamily: project.typography?.title || "sans-serif"
-                          }}
-                        >
-                          {project.name}
-                        </p>
-                        <p
-                          className="text-[7px] block italic line-clamp-1 mt-0.5"
-                          style={{
-                            color: project.backgroundColor === "#FFFFFF" || project.backgroundColor === "#FDFCFA" ? "#64748B" : "#CBD5E1",
-                            fontFamily: project.typography?.body || "sans-serif"
-                          }}
-                        >
-                          &ldquo;{project.slogan || "Terdepan & Terpercaya"}&rdquo;
-                        </p>
-                      </div>
-                      
-                      {/* Hover action overlay */}
-                      <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => onEditProject(project)}
-                          className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer"
-                          title="Buka Editor"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => onPreviewProject(project)}
-                          className="p-1.5 bg-white hover:bg-slate-100 text-slate-800 rounded-lg cursor-pointer"
-                          title="Lihat Mockup"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                    <div className="mt-auto pt-3 border-t border-stone-100 flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-[10px] text-stone-400 font-mono">
+                        <Clock className="w-3 h-3" />
+                        {new Date(project.createdAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <button
+                        onClick={() => onDeleteProject(project.id)}
+                        className="p-1.5 text-stone-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                        title="Hapus"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-
-                  {/* Date and Delete Action Row */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                    <span className="flex items-center gap-1 font-mono">
-                      <Clock className="w-3 h-3 text-slate-300" />
-                      {new Date(project.createdAt).toLocaleDateString("id-ID")}
-                    </span>
-
-                    <button
-                      onClick={() => onDeleteProject(project.id)}
-                      className="text-slate-400 hover:text-rose-600 p-1 rounded-md cursor-pointer transition-colors"
-                      title="Hapus Proyek"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
 
-          {projects.length > 0 && (
-            <div className="mt-6 text-center">
+          {projects.length > 6 && (
+            <div className="mt-5 text-center">
               <button
                 onClick={onViewHistory}
-                className="text-xs text-blue-600 hover:text-blue-700 font-bold inline-flex items-center gap-1 cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-700 font-semibold cursor-pointer"
               >
-                <span>Lihat Semua Daftar Riwayat Lengkap</span>
-                <ChevronRight className="w-3 h-3" />
+                <span>Lihat semua riwayat</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
-        </div>
+        </section>
       </main>
 
-      {/* Footer copyright */}
-      <footer className="bg-white border-t border-slate-200 py-6 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-400 font-mono">
-          PT Kreatif Percetakan Indonesia — Dashboard Hub Platform v1.4.0
-        </div>
+      <footer className="border-t border-stone-200 py-5 text-center">
+        <p className="text-[11px] text-stone-400 font-mono">
+          PageFree — Alat Desain Percetakan Berbasis AI · 2026
+        </p>
       </footer>
     </div>
   );

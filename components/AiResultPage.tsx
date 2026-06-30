@@ -9,7 +9,7 @@ interface AiResultPageProps {
     category: string;
     audience: string;
     concept: string;
-    productType: "Kartu Nama" | "Sampul Rapor";
+    productType: string;
   };
   aiRecommendation: {
     color_palette: {
@@ -64,9 +64,9 @@ export default function AiResultPage({
             <span>Kembali Ke Form</span>
           </button>
           
-          <div className="flex items-center gap-1.5 font-mono text-xs text-slate-400">
-            <Sparkles className="w-3.5 h-3.5 text-blue-500 animate-spin" />
-            <span>AI recommendation successfully generated</span>
+          <div className="flex items-center gap-1.5 font-medium text-xs text-stone-500">
+            <Sparkles className="w-3.5 h-3.5 text-teal-500 animate-pulse" />
+            <span>Rekomendasi AI berhasil dibuat</span>
           </div>
         </div>
       </header>

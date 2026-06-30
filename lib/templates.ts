@@ -4,7 +4,7 @@ export const DEFAULT_PROJECTS: DesignProject[] = [
   {
     id: "proj_card_tech",
     name: "AeroSpace Tech Solutions",
-    productType: "Kartu Nama",
+    productType: "Sampul Rapor",
     category: "Teknologi",
     concept: "Minimalis & Modern",
     audience: "B2B Clients, Investors",
@@ -326,7 +326,7 @@ export const DEFAULT_PROJECTS: DesignProject[] = [
   {
     id: "proj_card_minimalist",
     name: "Minimalist Studio",
-    productType: "Kartu Nama",
+    productType: "Sampul Rapor",
     category: "Creative Services",
     concept: "Minimalist",
     audience: "Creative Directors, Art Curators",

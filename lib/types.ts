@@ -16,10 +16,39 @@ export interface CanvasElement {
   zIndex: number;
 }
 
+/**
+ * Daftar jenis produk yang tersedia di aplikasi.
+ * Tambahkan produk baru di sini untuk muncul di halaman dashboard.
+ */
+export type ProductType = "Sampul Rapor";
+
+export interface ProductCatalogItem {
+  type: ProductType;
+  label: string;
+  description: string;
+  dimension: string;
+  icon: string; // emoji atau kode ikon
+  available: boolean;
+}
+
+/** Katalog produk yang ditampilkan di dashboard. Tambahkan entri baru di sini. */
+export const PRODUCT_CATALOG: ProductCatalogItem[] = [
+  {
+    type: "Sampul Rapor",
+    label: "Sampul Rapor",
+    description: "Sampul buku laporan / rapor sekolah dengan desain elegan dan profesional.",
+    dimension: "A4 (210 × 297 mm)",
+    icon: "📄",
+    available: true,
+  },
+  // Tambahkan produk lain di sini di masa mendatang, misal:
+  // { type: "Sertifikat", label: "Sertifikat", ..., available: false }
+];
+
 export interface DesignProject {
   id: string;
   name: string;
-  productType: "Kartu Nama" | "Sampul Rapor";
+  productType: ProductType;
   category: string;
   concept: string;
   audience: string;

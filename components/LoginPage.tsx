@@ -2,35 +2,31 @@
 
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { Sparkles, Printer, Lock, Mail, ArrowRight } from "lucide-react";
+import { Sparkles, Printer, Chrome } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
-interface LoginPageProps {
-  onLogin: (email: string) => void;
-}
-
-export default function LoginPage({ onLogin }: LoginPageProps) {
-  const [email, setEmail] = useState("anamjumantono4@gmail.com");
-  const [password, setPassword] = useState("password123");
+export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const supabase = createClient();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      setError("Email wajib diisi.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("Password minimal 6 karakter.");
-      return;
-    }
+  const handleGoogleLogin = async () => {
     setError("");
     setIsLoading(true);
 
-    setTimeout(() => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        // Setelah Google selesai, redirect ke callback handler kita
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      setError("Gagal memulai login Google. Silakan coba lagi.");
       setIsLoading(false);
-      onLogin(email);
-    }, 1200);
+    }
+    // Jika berhasil, browser akan redirect ke Google — tidak perlu setIsLoading(false)
   };
 
   return (
@@ -54,119 +50,90 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
         {/* Content Box */}
         <div className="my-auto py-12 max-w-sm w-full mx-auto" id="login-main-form-box">
-          <div className="mb-8" id="login-welcome-text">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-950 font-display-space">
-              Selamat datang kembali
-            </h1>
-            <p className="text-slate-500 mt-2 text-sm">
-              Masuk untuk mulai mengonsep, menyusun, dan mencetak desain profesional Anda dengan panduan AI.
-            </p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="mb-8" id="login-welcome-text">
+              <h1 className="text-3xl font-bold tracking-tight text-slate-950 font-display-space">
+                Selamat datang
+              </h1>
+              <p className="text-slate-500 mt-2 text-sm">
+                Masuk dengan akun Google Anda untuk mulai mengonsep, menyusun, dan mencetak desain profesional dengan panduan AI.
+              </p>
+            </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5" id="login-form">
             {error && (
-              <div className="p-3.5 bg-rose-50 text-rose-600 text-xs rounded-lg border border-rose-100 font-medium animate-shake" id="login-error-alert">
+              <div
+                className="mb-5 p-3.5 bg-rose-50 text-rose-600 text-xs rounded-lg border border-rose-100 font-medium"
+                id="login-error-alert"
+              >
                 {error}
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5" htmlFor="email-input">
-                Alamat Email
-              </label>
-              <div className="relative" id="email-field-container">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
-                  <Mail className="w-4 h-4" />
-                </span>
-                <input
-                  id="email-input"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all text-slate-900 font-medium"
-                  placeholder="name@company.com"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500" htmlFor="password-input">
-                  Kata Sandi
-                </label>
-                <a href="#forgot" className="text-xs text-blue-600 hover:underline font-medium" id="forgot-password-link">
-                  Lupa Sandi?
-                </a>
-              </div>
-              <div className="relative" id="password-field-container">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
-                  <Lock className="w-4 h-4" />
-                </span>
-                <input
-                  id="password-input"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all text-slate-900 font-medium"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center" id="remember-me-container">
-              <input
-                id="remember"
-                type="checkbox"
-                defaultChecked
-                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-              />
-              <label htmlFor="remember" className="ml-2 text-xs text-slate-500 cursor-pointer font-medium select-none">
-                Ingatkan saya di browser ini
-              </label>
-            </div>
-
             <button
-              id="login-submit-button"
-              type="submit"
+              id="google-login-button"
+              onClick={handleGoogleLogin}
               disabled={isLoading}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-400 text-white font-semibold rounded-xl shadow-lg shadow-blue-100 hover:shadow-blue-200 flex items-center justify-center gap-2 transform transition-all active:scale-[0.98] cursor-pointer"
+              className="w-full py-3.5 bg-white hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60 disabled:cursor-not-allowed border border-slate-200 hover:border-slate-300 text-slate-800 font-semibold rounded-xl shadow-sm hover:shadow-md flex items-center justify-center gap-3 transform transition-all active:scale-[0.98] cursor-pointer"
             >
               {isLoading ? (
                 <>
-                  <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  <span>Membuka Akses Premium...</span>
+                  <span>Menghubungkan ke Google...</span>
                 </>
               ) : (
                 <>
-                  <span>Masuk Ruang Desain</span>
-                  <ArrowRight className="w-4 h-4" />
+                  {/* Google "G" SVG Logo */}
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                  </svg>
+                  <span>Lanjutkan dengan Google</span>
                 </>
               )}
             </button>
-          </form>
 
-          {/* Quick Demo Assist */}
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center" id="demo-info-panel">
-            <p className="text-xs text-slate-400 font-medium">Bekerja dalam Mode Demo Instan</p>
-            <button
-              onClick={() => onLogin("anamjumantono4@gmail.com")}
-              className="mt-2.5 text-xs text-blue-600 hover:text-blue-700 font-semibold inline-flex items-center gap-1 cursor-pointer"
-            >
-              <Sparkles className="w-3 h-3 text-amber-500 animate-pulse" />
-              <span>Gunakan Akun Default (Anam Jumantono)</span>
-            </button>
+            <div className="mt-6 text-center">
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Dengan masuk, Anda menyetujui{" "}
+                <span className="text-blue-600 font-medium">Syarat & Ketentuan</span>{" "}
+                dan{" "}
+                <span className="text-blue-600 font-medium">Kebijakan Privasi</span>{" "}
+                Page Free.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Quick Info */}
+          <div className="mt-10 pt-6 border-t border-slate-100" id="feature-highlights">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 text-center">Mengapa Page Free?</p>
+            <div className="space-y-2.5">
+              {[
+                "Rekomendasi warna & tipografi otomatis dari Gemini AI",
+                "Proyek tersimpan aman di cloud — akses dari mana saja",
+                "Editor kanvas interaktif siap pakai tanpa coding",
+              ].map((feat) => (
+                <div key={feat} className="flex items-start gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                  <span className="text-xs text-slate-500">{feat}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Footer info */}
         <div className="text-center lg:text-left" id="login-footer">
           <p className="text-xs text-slate-400 font-mono">
-            Page Free v1.4.0 — © 2026 PT Kreatif Percetakan Indonesia
+            Page Free v2.0.0 — © 2026 PT Kreatif Percetakan Indonesia
           </p>
         </div>
       </div>
@@ -189,7 +156,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               {/* Symbolic Printer Plate Floating item */}
               <div className="w-64 h-40 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-2xl shadow-2xl relative border border-blue-400/30 flex items-center justify-center overflow-hidden mx-auto">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.1),transparent)]" />
-                
+
                 {/* Paper feeds in */}
                 <motion.div
                   className="absolute bottom-4 left-6 right-6 h-28 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 p-3 overflow-hidden flex flex-col justify-between"
@@ -256,7 +223,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         {/* Small badge */}
         <div className="absolute bottom-8 right-8 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/60 text-[10px] font-mono tracking-wider">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-          <span>PREVIEW iFRAME MODE ACTIVE</span>
+          <span>SUPABASE AUTH ACTIVE</span>
         </div>
       </div>
     </div>
