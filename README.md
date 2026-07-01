@@ -1,74 +1,121 @@
-# Web-to-Print Editor (SaaS Sampul Rapor)
+# Web-to-Print Editor
 
-Selamat datang di repositori **Web-to-Print Editor**, sebuah platform lunak berbasis web (*Software as a Service*) yang ditujukan untuk digitalisasi pra-cetak industri pembuatan sampul rapor (SD, SMP, SMA, MAN). 
+> Platform *Software as a Service* (SaaS) untuk digitalisasi dan otomatisasi proses desain pra-cetak sampul rapor sekolah (SD, SMP, SMA, MAN).
 
-Aplikasi ini menyederhanakan siklus desain dengan menggabungkan Editor Vektor bergaya klasik, otomatisasi AI Generatif dari Google Gemini, dan rendering Mockup 3D interaktif. Klien percetakan kini dapat merancang tata letak rapor sendiri dalam hitungan menit tanpa harus memiliki keterampilan desain tingkat lanjut!
-
----
-
-## ✨ Fitur Utama
-
-- **🤖 AI Auto-Layout Generator (Gemini)**
-  Tidak tahu cara menyusun teks yang proporsional? Cukup ketik Nama Sekolah, Judul, dan Alamat, lalu AI Google Gemini akan otomatis mendesain ukuran font, tata letak, dan koordinat *canvas* secara matematis.
-- **🎨 Web-Based Vector Editor (Gaya CorelDRAW Klasik)**
-  Editor kanvas interaktif yang memungkinkan *drag & drop*, undo/redo, serta kustomisasi warna dan font (Times New Roman & Arial). Dilengkapi fitur **Sumbu X Lock** (Gembok Rata Tengah) untuk menjaga teks tetap presisi di tengah desain.
-- **📏 Constraint Zona Mika (Anti-Tabrak)**
-  Sistem perlindungan cerdas yang melarang (*blocking*) penempatan elemen teks di koordinat `Y = 50 - 80`. Hal ini dirancang untuk mencegah tulisan cetak tertimpa lubang plastik transparan (Mika Nama) fisik pada buku rapor.
-- **🖼️ Image Import & Smart Vector Tracing**
-  Dukung penarikan gambar kustom (Logo Sekolah). Saat diimpor, gambar otomatis dibatasi rasio skalanya maksimal 30% dan dikonversi secara pintar menjadi vektor hitam-putih (*B&W*) demi kebutuhan plat cetak metode "Embos Foil" maupun "Sablon".
-- **🕶️ Pratinjau Mockup 3D (Realistis)**
-  Lihat hasil akhirnya dengan interaksi efek 3D *Parallax*. Mensimulasikan tekstur ASE kulit, bayangan fisik, dan pantulan (*glare*) material foil emas sebelum masuk meja produksi nyata.
+Proyek ini merupakan Tugas Akhir Program Studi D3 Teknik Informatika.
 
 ---
 
-## 🛠️ Technology Stack
+## Deskripsi
 
-Sistem dibangun secara *Full-Stack* (Client-Server) menggunakan teknologi web modern:
-- **Framework Utama:** `React.js`, `Next.js (App Router)`
-- **Styling UI:** `Tailwind CSS`, `Vanilla CSS`
-- **Kecerdasan Buatan:** `Google Gemini 3.5 Flash API`
-- **Database & Auth:** `Supabase (PostgreSQL)` untuk penyimpanan state (JSONB) *Canvas* (Project) dan file SVG *Vector Asset*.
+Industri percetakan konvensional masih mengandalkan perangkat lunak berat seperti CorelDRAW untuk menyusun tata letak sampul rapor secara manual. Proses ini memakan waktu, rawan kesalahan teknis, dan tidak dapat diakses oleh klien tanpa keahlian desain.
+
+Web-to-Print Editor hadir sebagai solusi berbasis web yang menggabungkan tiga pilar utama:
+
+1. **Otomatisasi berbasis AI** — Tata letak elemen desain dihasilkan secara otomatis menggunakan Google Gemini.
+2. **Editor vektor interaktif** — Antarmuka berbasis kanvas yang bekerja langsung di browser tanpa instalasi.
+3. **Pratinjau produk fisik** — Visualisasi 3D yang mensimulasikan tampilan nyata sebelum naik cetak.
 
 ---
 
-## 🚀 Instalasi & Menjalankan Aplikasi Lokal
+## Fitur Utama
 
-Ikuti langkah-langkah di bawah ini untuk menjalankan aplikasi di mesin lokal Anda:
+### AI Auto-Layout Generator
+Pengguna cukup mengisi formulir (nama sekolah, judul, alamat). Sistem AI secara otomatis menghasilkan susunan elemen desain beserta koordinat, hierarki ukuran font (`43pt → 33pt → 23pt → 13pt`), dan warna yang sesuai metode cetak yang dipilih.
 
-### 1. Prasyarat
-Pastikan Anda sudah menginstal:
-- [Node.js](https://nodejs.org/en/) (Versi terbaru atau LTS direkomendasikan)
-- Akun [Supabase](https://supabase.com) (Untuk Database)
-- API Key [Google Gemini AI Studio](https://aistudio.google.com/app/apikey)
+### Vector Editor (Gaya CorelDRAW)
+Antarmuka editor kanvas interaktif yang familiar bagi operator percetakan, dilengkapi dengan:
+- Drag & drop elemen (teks, logo, gambar)
+- Undo / Redo hingga 50 langkah
+- Sistem **Kunci Sumbu X** — elemen terkunci di posisi rata tengah secara default; pengguna membuka gembok untuk menggeser bebas
+- Panel Properties adaptif per jenis elemen
 
-### 2. Kloning Repositori & Instalasi
+### Constraint Zona Mika
+Sistem perlindungan koordinat yang memblokir penempatan elemen teks di rentang `Y = 50–80`. Area ini dicadangkan untuk jendela plastik transparan (*mika nama*) yang terdapat secara fisik pada buku rapor.
+
+### Image Import & Vector Tracing
+Pengguna dapat mengimpor logo sekolah (JPG, PNG, SVG). Sistem otomatis:
+- Membatasi ukuran gambar maksimal 30% lebar kanvas
+- Mengonversi gambar ke vektor hitam-putih (*B&W*) untuk keperluan cetak embos foil dan sablon
+
+### Pratinjau Mockup 3D
+Desain yang telah dibuat dapat divisualisasikan dalam bentuk mockup tiga dimensi interaktif dengan efek *parallax* berbasis pergerakan kursor, simulasi tekstur bahan ASE, pantulan material foil, dan representasi mika fisik.
+
+---
+
+## Technology Stack
+
+| Lapisan | Teknologi |
+|---|---|
+| Framework | Next.js (App Router), React.js |
+| Styling | Tailwind CSS, Vanilla CSS |
+| Kecerdasan Buatan | Google Gemini 3.5 Flash API |
+| Database | Supabase (PostgreSQL) |
+| Autentikasi | Supabase Auth (Row Level Security) |
+| Penyimpanan Aset | Supabase Storage |
+
+---
+
+## Instalasi
+
+### Prasyarat
+
+- [Node.js](https://nodejs.org/en/) LTS atau versi terbaru
+- Akun [Supabase](https://supabase.com)
+- API Key dari [Google AI Studio](https://aistudio.google.com/app/apikey)
+
+### Langkah Instalasi
+
+**1. Instal dependensi**
+
 ```bash
-# Instal dependensi
 npm install
+# atau
+pnpm install
 ```
 
-### 3. Pengaturan *Environment Variables*
-Ubah nama file `.env.example` menjadi `.env.local`, kemudian lengkapi data kredensial berikut:
+**2. Konfigurasi environment**
+
+Salin file `.env.example` menjadi `.env.local` dan isi dengan kredensial berikut:
+
 ```env
-NEXT_PUBLIC_SUPABASE_URL="https://[YOUR_SUPABASE_ID].supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOi..."
-GEMINI_API_KEY="AIzaSyA..."
+NEXT_PUBLIC_SUPABASE_URL="https://[YOUR_PROJECT_ID].supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
+GEMINI_API_KEY="your-gemini-api-key"
 ```
 
-### 4. Menyiapkan Database Supabase
-Jalankan file *SQL script* yang tersedia di *folder* `/supabase` pada dasbor SQL Editor Supabase Anda untuk membangun skema tabel yang dibutuhkan:
-- Jalankan `supabase/schema.sql` (Untuk tabel `design_projects`)
-- Jalankan `supabase/assets_schema.sql` (Untuk tabel `user_assets`)
+**3. Inisialisasi database**
 
-### 5. Jalankan Server Pengembangan
+Buka SQL Editor pada dasbor Supabase Anda, lalu jalankan kedua skrip berikut secara berurutan:
+
+```
+supabase/schema.sql        → Membuat tabel design_projects
+supabase/assets_schema.sql → Membuat tabel user_assets
+```
+
+**4. Jalankan server pengembangan**
+
 ```bash
 npm run dev
-# Atau jika menggunakan pnpm
+# atau
 pnpm run dev
 ```
-Buka browser dan akses [http://localhost:3000](http://localhost:3000)
+
+Buka [http://localhost:3000](http://localhost:3000) di browser Anda.
 
 ---
 
-## 📝 Lisensi
-Proyek ini dibuat untuk keperluan Tugas Akhir / Penelitian D3 dan bersifat sumber terbuka (*open-source*) untuk penggunaan edukasional.
+## Struktur Database
+
+Sistem menggunakan dua tabel utama:
+
+- **`design_projects`** — Menyimpan seluruh data proyek termasuk elemen kanvas dalam format JSONB, metode cetak, ukuran kertas, dan status pengerjaan.
+- **`user_assets`** — Menyimpan aset gambar yang diunggah pengguna beserta hasil konversi vektor SVG-nya.
+
+Kedua tabel dilindungi dengan kebijakan *Row Level Security* (RLS) sehingga setiap pengguna hanya dapat mengakses data miliknya sendiri.
+
+---
+
+## Lisensi
+
+Proyek ini dikembangkan untuk keperluan akademik (Tugas Akhir D3) dan terbuka untuk penggunaan edukasional.
