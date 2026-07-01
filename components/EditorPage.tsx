@@ -31,8 +31,14 @@ import {
   File,
   Edit,
   MoreHorizontal,
-  FolderOpen
+  FolderOpen,
+  Image as ImageIcon,
+  Wand2,
+  Download,
+  Lock,
+  Unlock
 } from "lucide-react";
+import ImageToVectorConverter from "./ImageToVectorConverter";
 
 interface EditorPageProps {
   project: DesignProject;
@@ -42,17 +48,17 @@ interface EditorPageProps {
 }
 
 const PRESET_FONTS = [
-  { name: "Inter", label: "Inter (Modern)" },
-  { name: "Space Grotesk", label: "Space Grotesk (Tegas)" },
-  { name: "Outfit", label: "Outfit (Ramah)" },
-  { name: "Playfair Display", label: "Playfair (Elegan)" },
-  { name: "JetBrains Mono", label: "Mono (Teknis)" },
+  { name: "Times New Roman", label: "Times New Roman (Serif Utama)" },
+  { name: "Arial", label: "Arial (Tebal / Sans-Serif)" },
 ];
 
-const CORE_COLORS = [
-  "#FFFFFF", "#000000", "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF",
-  "#C0C0C0", "#808080", "#800000", "#808000", "#008000", "#800080", "#008080", "#000080",
-  "#FF9900", "#CC6600", "#990033", "#336699", "#669933", "#003366", "#333333", "#666666"
+const MATERIAL_COLORS = [
+  { name: "Maroon", hex: "#800000" },
+  { name: "Navy", hex: "#000080" },
+  { name: "Biru Muda Agak Tua", hex: "#4682B4" },
+  { name: "Hijau Tua", hex: "#006400" },
+  { name: "Hijau Botol", hex: "#004225" },
+  { name: "Hitam Abu (Soft)", hex: "#2C2C2C" }
 ];
 
 function generateId(prefix: string): string {
@@ -93,10 +99,12 @@ export default function EditorPage({
   
   // Docker panel tabs
   const [activeDocker, setActiveDocker] = useState<"properties" | "themes" | "elements">("properties");
+  const [showVectorConverter, setShowVectorConverter] = useState(false);
 
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, elX: 0, elY: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -146,20 +154,34 @@ export default function EditorPage({
     });
   }, [pushHistory]);
 
-  const addElement = useCallback((type: "text" | "shape" | "logo", props: Partial<CanvasElement>) => {
+  const addElement = useCallback((type: "text" | "shape" | "logo" | "custom_svg" | "image", props: Partial<CanvasElement>) => {
     const id = generateId("el");
     const zIndex = Math.max(0, ...project.elements.map((e) => e.zIndex)) + 1;
+    
+    let defaultColor = project.printMethod === "Embos Foil" ? "#D4AF37" : "#FFFFFF";
+    let defaultFont = props.fontFamily || "Times New Roman";
+    let defaultWeight: "normal"|"bold"|"medium" = defaultFont === "Arial" ? "bold" : "normal";
+    
+    if (props.fontWeight) defaultWeight = props.fontWeight;
+    
+    const w = props.width ?? (type === "text" ? 80 : 25);
     const newEl: CanvasElement = {
-      id, type, x: 30, y: 40,
-      width: type === "text" ? 40 : 15,
-      height: type === "text" ? 8 : 12,
-      zIndex, ...props,
+      id, type, x: 50 - (w / 2), y: 40,
+      width: w,
+      height: type === "text" ? 8 : 25,
+      zIndex, 
+      fontFamily: defaultFont,
+      fontWeight: defaultWeight,
+      color: defaultColor,
+      align: type === "text" ? "center" : undefined,
+      isLockedX: true,
+      ...props,
     };
     const next = [...project.elements, newEl];
     setProject((p) => ({ ...p, elements: next }));
     setSelectedId(id);
     pushHistory(next);
-  }, [project.elements, pushHistory]);
+  }, [project.elements, pushHistory, project.printMethod]);
 
   const deleteSelected = useCallback(() => {
     if (!selectedId) return;
@@ -190,6 +212,7 @@ export default function EditorPage({
   }, [selectedId, project.elements, commitUpdate]);
 
   const alignSelected = useCallback((type: "centerX" | "centerY" | "left" | "right") => {
+    if (!selectedId) return;
     const el = project.elements.find((e) => e.id === selectedId);
     if (!el) return;
     const updates: Partial<CanvasElement> = {};
@@ -228,8 +251,54 @@ export default function EditorPage({
     toast(`Tema diterapkan`);
   };
 
+  const handleImageImport = useCallback((file: File) => {
+    if (!file.type.startsWith('image/') && !file.name.endsWith('.svg')) {
+      toast("Format file tidak didukung! Hanya JPG/PNG/SVG.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const isSizeB = project.printSize === "Size B (17x23cm)";
+        const ratio = isSizeB ? (17 / 23) : (23 / 34);
+        const cardW = 400 * zoom;
+        const cardH = Math.round(cardW / ratio);
 
-  // ─── Drag & Drop ───────────────────────────────────────────────────────────
+        // Set import bounds to max 30% width and 40% height to keep ratio proportional
+        let w = 30; 
+        let h = w * (img.height / img.width) * (cardW / cardH);
+
+        if (h > 40) {
+           h = 40;
+           w = h * (img.width / img.height) / (cardW / cardH);
+        }
+        
+        w = parseFloat(w.toFixed(2));
+        h = parseFloat(h.toFixed(2));
+
+        addElement('image', { imageUrl: dataUrl, width: w, height: h });
+        toast("Gambar berhasil diimpor");
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  }, [addElement, toast, project.printSize, zoom]);
+
+  const handleFileDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleImageImport(e.dataTransfer.files[0]);
+    }
+  }, [handleImageImport]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
   const handleMouseDown = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     const el = project.elements.find((x) => x.id === id);
@@ -252,6 +321,11 @@ export default function EditorPage({
       let tx = Math.max(0, Math.min(95, dragStartRef.current.elX + dx));
       let ty = Math.max(0, Math.min(95, dragStartRef.current.elY + dy));
 
+      const elTypeObj = project.elements.find((e) => e.id === selectedId);
+      if (elTypeObj?.isLockedX) {
+        tx = 50 - (elTypeObj.width / 2);
+      }
+
       const guides: { type: "v" | "h"; value: number }[] = [];
       const snapPoints = [5, 50, 95];
       const thresh = 1.5;
@@ -259,6 +333,13 @@ export default function EditorPage({
         if (Math.abs(tx - sp) < thresh) { tx = sp; guides.push({ type: "v", value: sp }); }
         if (Math.abs(ty - sp) < thresh) { ty = sp; guides.push({ type: "h", value: sp }); }
       });
+
+      // MIKA constraint for text elements: Y 50-80 is forbidden
+      const elType = project.elements.find((e) => e.id === selectedId)?.type;
+      if (elType === "text" && ty >= 50 && ty <= 80) {
+        if (ty < 65) ty = 49;
+        else ty = 81;
+      }
 
       setActiveGuides(guides);
       setProject((p) => ({
@@ -287,7 +368,6 @@ export default function EditorPage({
     };
   }, [selectedId, zoom, pushHistory]);
 
-  // ─── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (document.activeElement as HTMLElement)?.tagName;
@@ -299,13 +379,18 @@ export default function EditorPage({
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId) { e.preventDefault(); deleteSelected(); return; }
 
       if (!selectedId) return;
+      const el = project.elements.find((x) => x.id === selectedId);
       const step = e.shiftKey ? 5 : 1;
       const move: Record<string, Partial<CanvasElement>> = {
-        ArrowUp: { y: Math.max(0, (project.elements.find((x) => x.id === selectedId)?.y ?? 0) - step) },
-        ArrowDown: { y: Math.min(95, (project.elements.find((x) => x.id === selectedId)?.y ?? 0) + step) },
-        ArrowLeft: { x: Math.max(0, (project.elements.find((x) => x.id === selectedId)?.x ?? 0) - step) },
-        ArrowRight: { x: Math.min(95, (project.elements.find((x) => x.id === selectedId)?.x ?? 0) + step) },
+        ArrowUp: { y: Math.max(0, (el?.y ?? 0) - step) },
+        ArrowDown: { y: Math.min(95, (el?.y ?? 0) + step) },
       };
+      
+      if (!el?.isLockedX) {
+        move.ArrowLeft = { x: Math.max(0, (el?.x ?? 0) - step) };
+        move.ArrowRight = { x: Math.min(95, (el?.x ?? 0) + step) };
+      }
+
       if (move[e.key]) { e.preventDefault(); updateElement(selectedId, move[e.key]); }
     };
     window.addEventListener("keydown", onKey);
@@ -314,9 +399,10 @@ export default function EditorPage({
 
 
   const selectedEl = project.elements.find((e) => e.id === selectedId);
-  // A4 ratio canvas
-  const canvasW = 420;
-  const canvasH = 594;
+  const isSizeB = project.printSize === "Size B (17x23cm)";
+  const ratio = isSizeB ? (17 / 23) : (23 / 34);
+  const canvasW = 400 * zoom;
+  const canvasH = Math.round(canvasW / ratio);
 
   const handleColorClick = (hex: string) => {
     if (selectedEl) {
@@ -354,14 +440,18 @@ export default function EditorPage({
 
       {/* ─── 2. STANDARD TOOLBAR ─────────────────────────────────────────── */}
       <div className="flex items-center gap-1 bg-[#F0F0F0] border-b border-[#A0A0A0] p-1" style={{boxShadow: "inset 0 1px 0 #FFF"}}>
-        <button onClick={onBackToDashboard} className="p-1 hover:bg-[#D5E1F2] border border-transparent hover:border-[#99B4D1] rounded-sm flex items-center justify-center w-6 h-6" title="Dashboard">
-          <ChevronLeft size={16}/>
+        <button onClick={onBackToDashboard} className="px-2 py-1 hover:bg-[#D5E1F2] border border-transparent hover:border-[#99B4D1] rounded-sm flex items-center justify-center gap-1 text-gray-700 font-semibold" title="Kembali ke Dashboard">
+          <ChevronLeft size={16}/> <span>Back</span>
         </button>
-        <button onClick={() => { onSaveProject(project); toast("Project Saved"); }} className="p-1 hover:bg-[#D5E1F2] border border-transparent hover:border-[#99B4D1] rounded-sm flex items-center justify-center w-6 h-6" title="Save (Ctrl+S)">
-          <Save size={16}/>
+        
+        <div className="w-px h-5 bg-[#A0A0A0] mx-1 border-r border-[#FFF]"></div>
+        
+        <button onClick={() => { onSaveProject(project); toast("Project Saved"); }} className="px-2 py-1 hover:bg-[#D5E1F2] border border-transparent hover:border-[#99B4D1] rounded-sm flex items-center justify-center gap-1 text-gray-700 font-semibold" title="Simpan Proyek (Ctrl+S)">
+          <Save size={16}/> <span>Save</span>
         </button>
-        <button onClick={() => onExport(project)} className="p-1 hover:bg-[#D5E1F2] border border-transparent hover:border-[#99B4D1] rounded-sm flex items-center justify-center w-6 h-6 text-blue-700" title="Print/Export">
-          <Eye size={16}/>
+        
+        <button onClick={() => onExport(project)} className="px-3 py-1 bg-gradient-to-b from-[#E8F0F9] to-[#C9E0F7] border border-[#62A2E4] hover:from-[#C9E0F7] hover:to-[#A9CFF1] rounded-sm flex items-center justify-center gap-1 text-blue-800 font-bold shadow-sm" title="Ekspor ke PDF atau Print">
+          <Download size={16}/> <span>Export / Print</span>
         </button>
         
         <div className="w-px h-5 bg-[#A0A0A0] mx-1 border-r border-[#FFF]"></div>
@@ -393,7 +483,6 @@ export default function EditorPage({
 
         <div className="w-px h-5 bg-[#A0A0A0] mx-1 border-r border-[#FFF]"></div>
         
-        {/* Quick toggle for dockers */}
         <button onClick={() => setActiveDocker('properties')} className={`p-1 border rounded-sm flex items-center justify-center w-6 h-6 ${activeDocker === 'properties' ? 'bg-[#C9E0F7] border-[#62A2E4]' : 'hover:bg-[#D5E1F2] border-transparent hover:border-[#99B4D1]'}`} title="Object Properties Docker">
           <Layers size={16}/>
         </button>
@@ -488,25 +577,31 @@ export default function EditorPage({
         <section
           className="flex-grow bg-[#D8D8DB] overflow-auto flex items-center justify-center p-8 relative"
           onClick={() => setSelectedId(null)}
+          onDrop={handleFileDrop}
+          onDragOver={handleDragOver}
           id="canvas-area"
           style={{boxShadow: "inset 2px 2px 5px rgba(0,0,0,0.2)"}}
         >
           {/* Canvas paper */}
-          <div
-            ref={canvasRef}
-            className="relative select-none border border-[#999]"
+          <div 
+            className="bg-white shadow-xl relative transition-all duration-300"
             style={{
-              width: canvasW,
-              height: canvasH,
-              backgroundColor: project.backgroundColor || "#ffffff",
-              transform: `scale(${zoom})`,
-              transformOrigin: "center center",
-              transition: "transform 0.1s ease",
-              boxShadow: "3px 3px 6px rgba(0,0,0,0.3)"
+              width: `${canvasW}px`,
+              height: `${canvasH}px`,
+              backgroundColor: project.materialColor || project.backgroundColor || "#800000"
             }}
-            id="canvas-paper"
+            ref={canvasRef}
           >
-            {/* Grid overlay */}
+            {/* Tekstur Bahan SVG Overlay */}
+            <svg className="absolute inset-0 pointer-events-none w-full h-full opacity-60 mix-blend-multiply" style={{ zIndex: 1 }}>
+              <filter id="leather-texture">
+                <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" result="noise" />
+                <feColorMatrix type="matrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   0 0 0 0.3 0" />
+              </filter>
+              <rect width="100%" height="100%" filter="url(#leather-texture)" />
+            </svg>
+
+            {/* Grid Overlay */}
             {showGrid && (
               <div
                 className="absolute inset-0 pointer-events-none opacity-[0.2]"
@@ -515,7 +610,7 @@ export default function EditorPage({
             )}
 
             {/* SVG elements */}
-            <svg className="absolute inset-0 w-full h-full" id="canvas-svg">
+            <svg className="absolute inset-0 w-full h-full" id="canvas-svg" style={{zIndex: 2}}>
               {[...project.elements].sort((a, b) => a.zIndex - b.zIndex).map((el) => {
                 const ex = `${el.x}%`, ey = `${el.y}%`, ew = `${el.width}%`, eh = `${el.height}%`;
                 const sel = el.id === selectedId;
@@ -556,6 +651,22 @@ export default function EditorPage({
                         </text>
                       </svg>
                     )}
+                    {el.type === "custom_svg" && el.customSvg && (
+                      <g dangerouslySetInnerHTML={{ 
+                        __html: el.customSvg
+                          .replace(/fill="[^"]*"/g, `fill="${el.color || '#000000'}"`)
+                          .replace(/<svg([^>]*)>/, (match, p1) => {
+                            let attrs = p1.replace(/\s(x|y|width|height)="[^"]*"/g, '');
+                            if (!attrs.includes("preserveAspectRatio")) {
+                              attrs += ' preserveAspectRatio="xMidYMid meet"';
+                            }
+                            return `<svg x="${el.x}%" y="${el.y}%" width="${el.width}%" height="${el.height}%" ${attrs} overflow="visible">`;
+                          })
+                      }} />
+                    )}
+                    {el.type === "image" && el.imageUrl && (
+                      <image x={ex} y={ey} width={ew} height={eh} href={el.imageUrl} preserveAspectRatio="none" />
+                    )}
 
                     {/* Classic Selection outline with 8 black squares */}
                     {sel && (
@@ -586,80 +697,195 @@ export default function EditorPage({
                   ? <line key={i} x1={`${g.value}%`} y1="0%" x2={`${g.value}%`} y2="100%" stroke="#000" strokeWidth="0.5" strokeDasharray="4 4" />
                   : <line key={i} x1="0%" y1={`${g.value}%`} x2="100%" y2={`${g.value}%`} stroke="#000" strokeWidth="0.5" strokeDasharray="4 4" />
               ))}
+
+              {/* Mika Nama Overlay */}
+              <image
+                href="/mika-nama.png"
+                x={isSizeB ? '11.76%' : '21.73%'}
+                y={isSizeB ? '50%' : '66.17%'}
+                width={isSizeB ? '76.47%' : '56.52%'}
+                height={isSizeB ? '19.56%' : '13.23%'}
+                preserveAspectRatio="none"
+                pointerEvents="none"
+              />
             </svg>
           </div>
         </section>
 
         {/* ─── 6. DOCKERS PANEL (Right) ──────────────────────────────────── */}
         <div className="w-72 bg-[#F0F0F0] border-l border-[#A0A0A0] flex flex-col shrink-0">
-          <div className="flex bg-[#E0DFE3] border-b border-[#A0A0A0] text-xs font-semibold" style={{boxShadow: "inset 0 1px 0 #FFF"}}>
+          {/* TABS */}
+          <div className="flex border-b border-[#A0A0A0] text-[11px] font-bold bg-[#F0F0F0]">
             <button 
               onClick={() => setActiveDocker("properties")}
-              className={`flex-1 py-1.5 border-r border-[#A0A0A0] ${activeDocker === 'properties' ? 'bg-[#F0F0F0] shadow-[inset_0_1px_0_#FFF]' : 'hover:bg-[#D5E1F2] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]'}`}
+              className={`flex-1 py-1.5 border-r border-[#A0A0A0] ${activeDocker === "properties" ? "bg-[#FFF] border-b-transparent relative top-px" : "bg-transparent shadow-[inset_-1px_-1px_0_#999]"}`}
             >
               Properties
             </button>
             <button 
               onClick={() => setActiveDocker("elements")}
-              className={`flex-1 py-1.5 border-r border-[#A0A0A0] ${activeDocker === 'elements' ? 'bg-[#F0F0F0] shadow-[inset_0_1px_0_#FFF]' : 'hover:bg-[#D5E1F2] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]'}`}
+              className={`flex-1 py-1.5 border-r border-[#A0A0A0] ${activeDocker === "elements" ? "bg-[#FFF] border-b-transparent relative top-px" : "bg-transparent shadow-[inset_-1px_-1px_0_#999]"}`}
             >
               Insert
             </button>
             <button 
               onClick={() => setActiveDocker("themes")}
-              className={`flex-1 py-1.5 ${activeDocker === 'themes' ? 'bg-[#F0F0F0] shadow-[inset_0_1px_0_#FFF]' : 'hover:bg-[#D5E1F2] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]'}`}
+              className={`flex-1 py-1.5 ${activeDocker === "themes" ? "bg-[#FFF] border-b-transparent relative top-px" : "bg-transparent shadow-[inset_-1px_-1px_0_#999]"}`}
             >
               Themes
             </button>
           </div>
-          
+
           <div className="flex-1 p-2 overflow-y-auto">
-            
-            {/* DOCKER: PROPERTIES */}
-            {activeDocker === 'properties' && (
-              selectedEl ? (
-                <div className="space-y-4">
-                  {selectedEl.type === 'text' && (
+            {/* TAB CONTENT: Properties */}
+            {activeDocker === "properties" && (
+              <div className="space-y-3">
+                {/* PROJECT MOCKUP SETTINGS (WHEN NOTHING SELECTED) */}
+                {!selectedEl && (
+                  <div className="border border-[#A0A0A0] bg-[#F9F9F9] p-2">
+                    <p className="font-semibold text-gray-600 mb-2 flex items-center gap-1 border-b border-gray-300 pb-1">
+                      <Layers size={14}/> Mockup & Bahan
+                    </p>
+                    
+                    <div className="space-y-3 mt-2">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 mb-1 block">Ukuran Cetak</label>
+                        <select 
+                          className="w-full border border-gray-300 rounded p-1 text-xs"
+                          value={project.printSize || "Size A (23x34cm)"}
+                          onChange={(e) => setProject({...project, printSize: e.target.value as "Size A (23x34cm)" | "Size B (17x23cm)"})}
+                        >
+                          <option value="Size A (23x34cm)">Ukuran A (23x34cm)</option>
+                          <option value="Size B (17x23cm)">Ukuran B (17x23cm)</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 mb-1 block">Metode Cetak</label>
+                        <select 
+                          className="w-full border border-gray-300 rounded p-1 text-xs"
+                          value={project.printMethod || "Embos Foil"}
+                          onChange={(e) => {
+                            const method = e.target.value as "Embos Foil" | "Sablon";
+                            const forcedColor = method === "Embos Foil" ? "#D4AF37" : "#FFFFFF";
+                            const elements = project.elements.map(el => ({ ...el, color: forcedColor }));
+                            setProject({ ...project, printMethod: method, elements });
+                          }}
+                        >
+                          <option value="Embos Foil">Embos Foil (Hanya Warna Emas)</option>
+                          <option value="Sablon">Sablon (Hitam / Putih)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 mb-1 block">Warna Dasar Bahan (ASE/Kulit)</label>
+                        <div className="grid grid-cols-6 gap-1">
+                          {MATERIAL_COLORS.map(c => (
+                            <div
+                              key={c.hex}
+                              onClick={() => setProject({...project, materialColor: c.hex})}
+                              className={`w-full aspect-square rounded cursor-pointer border-2 ${project.materialColor === c.hex || (!project.materialColor && project.backgroundColor === c.hex) ? 'border-blue-500 shadow-sm' : 'border-gray-300'}`}
+                              style={{backgroundColor: c.hex}}
+                              title={c.name}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ELEMENT PROPERTIES (WHEN SELECTED) */}
+                {selectedEl && (
+                  <div className="space-y-4">
+                    {/* Universal Actions (Lock/Unlock) */}
+                    <div className="border border-[#A0A0A0] bg-[#F9F9F9] p-2 flex justify-between items-center">
+                      <span className="font-semibold text-gray-600 text-xs flex items-center gap-1" title="Kunci elemen agar selalu di tengah secara mendatar">
+                        {selectedEl.isLockedX ? <Lock size={14} className="text-teal-600"/> : <Unlock size={14} className="text-amber-600"/>}
+                        Kunci Sumbu X (Tengah)
+                      </span>
+                      <button
+                        onClick={() => commitUpdate(selectedId!, { isLockedX: !selectedEl.isLockedX })}
+                        className={`px-2 py-1 text-[10px] font-bold rounded shadow-sm border transition ${
+                          selectedEl.isLockedX 
+                            ? "bg-teal-50 border-teal-200 text-teal-700 hover:bg-teal-100"
+                            : "bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100"
+                        }`}
+                      >
+                        {selectedEl.isLockedX ? "Buka Gembok" : "Kunci Tengah"}
+                      </button>
+                    </div>
+
+                    {/* Typography for text */}
+                    {selectedEl.type === "text" && (
+                      <div className="border border-[#A0A0A0] bg-[#F9F9F9] p-2">
+                        <p className="font-semibold text-gray-600 mb-2 flex items-center gap-1 border-b border-gray-300 pb-1">
+                          <TypeIcon size={14}/> Tipografi
+                        </p>
+                        <div className="space-y-2">
+                          <select 
+                            className="w-full p-1 text-xs border border-gray-300 rounded"
+                            value={selectedEl.fontFamily || "Times New Roman"}
+                            onChange={(e) => commitUpdate(selectedId!, { fontFamily: e.target.value })}
+                          >
+                            {PRESET_FONTS.map(f => (
+                              <option key={f.name} value={f.name}>{f.label}</option>
+                            ))}
+                          </select>
+                          <input 
+                            type="text" 
+                            className="w-full p-1 text-xs border border-gray-300 rounded" 
+                            value={selectedEl.text || ""} 
+                            onChange={(e) => commitUpdate(selectedId!, { text: e.target.value })} 
+                            placeholder="Ketik teks..." 
+                          />
+                          
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-500 mb-1 block">Ukuran Font</label>
+                            <input 
+                              type="number" 
+                              list="font-sizes"
+                              className="w-full border border-gray-300 rounded p-1 text-xs" 
+                              value={selectedEl.fontSize || 14} 
+                              onChange={(e) => commitUpdate(selectedId!, { fontSize: Number(e.target.value) })}
+                            />
+                            <datalist id="font-sizes">
+                              <option value="43" label="Judul Besar" />
+                              <option value="33" label="Subjudul" />
+                              <option value="23" label="Teks Sedang" />
+                              <option value="13" label="Keterangan Kecil" />
+                            </datalist>
+                          </div>
+                          
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => commitUpdate(selectedId!, { align: "left" })} className={`p-1 rounded ${selectedEl.align === 'left' ? 'bg-[#D5E1F2]' : 'hover:bg-gray-200'}`}><AlignLeft size={14}/></button>
+                            <button onClick={() => commitUpdate(selectedId!, { align: "center" })} className={`p-1 rounded ${selectedEl.align === 'center' ? 'bg-[#D5E1F2]' : 'hover:bg-gray-200'}`}><AlignCenter size={14}/></button>
+                            <button onClick={() => commitUpdate(selectedId!, { align: "right" })} className={`p-1 rounded ${selectedEl.align === 'right' ? 'bg-[#D5E1F2]' : 'hover:bg-gray-200'}`}><AlignRight size={14}/></button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Mockup Colors Constraints */}
                     <div className="border border-[#A0A0A0] bg-[#F9F9F9] p-2">
-                      <label className="block mb-1 font-semibold text-gray-600">Content:</label>
-                      <textarea 
-                        value={selectedEl.text || ""} 
-                        onChange={(e) => commitUpdate(selectedEl.id, {text: e.target.value})}
-                        className="w-full border border-[#A0A0A0] bg-white p-1 shadow-inner h-20 outline-none resize-none font-mono text-[10px]"
-                      />
-                    </div>
-                  )}
-                  
-                  <div className="border border-[#A0A0A0] bg-[#F9F9F9] p-2">
-                    <p className="font-semibold text-gray-600 mb-2">Fill Color</p>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-10 h-10 border border-[#A0A0A0] shadow-inner" style={{backgroundColor: selectedEl.color || "#000"}}></div>
-                      <input 
-                        type="text" 
-                        value={selectedEl.color || "#000000"} 
-                        onChange={(e) => commitUpdate(selectedEl.id, {color: e.target.value})}
-                        className="w-20 border border-[#A0A0A0] bg-white px-1 shadow-inner outline-none uppercase font-mono"
-                      />
-                    </div>
-                    <input 
-                      type="color" 
-                      value={selectedEl.color || "#000000"} 
-                      onChange={(e) => commitUpdate(selectedEl.id, {color: e.target.value})}
-                      className="w-full h-6"
-                    />
-                  </div>
-  
-                  <div className="border border-[#A0A0A0] bg-[#F9F9F9] p-2">
-                    <p className="font-semibold text-gray-600 mb-2">Transform Align</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => alignSelected('centerX')} className="py-1 px-2 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]">Center Horiz</button>
-                      <button onClick={() => alignSelected('centerY')} className="py-1 px-2 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]">Center Vert</button>
+                      <p className="font-semibold text-gray-600 mb-2 flex items-center gap-1 border-b border-gray-300 pb-1">
+                        <Palette size={14}/> Warna ({project.printMethod || "Embos Foil"})
+                      </p>
+                      <div className="flex gap-2">
+                        {(project.printMethod || "Embos Foil") === "Embos Foil" ? (
+                          <div className="w-8 h-8 rounded border-2 border-yellow-600 flex items-center justify-center font-bold text-[10px] text-white shadow-sm" style={{backgroundColor: "#D4AF37", background: "linear-gradient(135deg, #FFD700, #DAA520)"}} title="Emas Foil">Emas</div>
+                        ) : (
+                          <>
+                            <div onClick={() => commitUpdate(selectedId!, { color: "#FFFFFF" })} className={`w-8 h-8 rounded border-2 cursor-pointer ${selectedEl.color === "#FFFFFF" ? 'border-blue-500 shadow-sm' : 'border-gray-300'}`} style={{backgroundColor: "#FFFFFF"}} title="Putih"></div>
+                            <div onClick={() => commitUpdate(selectedId!, { color: "#111111" })} className={`w-8 h-8 rounded border-2 cursor-pointer ${selectedEl.color === "#111111" ? 'border-blue-500 shadow-sm' : 'border-gray-400'}`} style={{backgroundColor: "#111111"}} title="Hitam"></div>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-gray-500 mt-2">Warna disesuaikan otomatis dengan metode cetak yang Anda pilih pada setelan proyek.</p>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="text-gray-500 italic text-center mt-10">No object selected.</div>
-              )
+                )}
+              </div>
             )}
 
             {/* DOCKER: INSERT ELEMENTS */}
@@ -668,16 +894,54 @@ export default function EditorPage({
                 <div className="border border-[#A0A0A0] bg-[#F9F9F9] p-2">
                   <p className="font-semibold text-gray-600 mb-2 flex items-center gap-1 border-b border-gray-300 pb-1"><TypeIcon size={14}/> Text Presets</p>
                   <div className="space-y-1">
-                    <button onClick={() => addElement('text', {text: 'NAMA SEKOLAH', fontSize: 22, fontWeight: 'bold', width: 70})} className="w-full text-left p-1 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]">
+                    <button onClick={() => addElement('text', {text: 'NAMA SEKOLAH', fontSize: 43, fontWeight: 'bold', width: 80, align: 'center'})} className="w-full text-left p-1 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]">
                       <span className="font-bold text-[12px]">Teks Judul Besar</span>
                     </button>
-                    <button onClick={() => addElement('text', {text: 'Tahun Pelajaran', fontSize: 13, fontWeight: 'medium', width: 60})} className="w-full text-left p-1 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]">
+                    <button onClick={() => addElement('text', {text: 'Tahun Pelajaran', fontSize: 33, fontWeight: 'medium', width: 80, align: 'center'})} className="w-full text-left p-1 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]">
                       <span>Teks Subjudul</span>
                     </button>
-                    <button onClick={() => addElement('text', {text: 'NISN: 000', fontSize: 11, width: 40})} className="w-full text-left p-1 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]">
+                    <button onClick={() => addElement('text', {text: 'Alamat Sekolah', fontSize: 23, width: 80, align: 'center'})} className="w-full text-left p-1 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]">
+                      <span className="text-[11px]">Teks Sedang</span>
+                    </button>
+                    <button onClick={() => addElement('text', {text: 'NISN: 000', fontSize: 13, width: 80, align: 'center'})} className="w-full text-left p-1 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF]">
                       <span className="text-[10px]">Teks Keterangan</span>
                     </button>
                   </div>
+                </div>
+
+                <div className="border border-[#A0A0A0] bg-[#F9F9F9] p-2">
+                  <p className="font-semibold text-gray-600 mb-2 flex items-center gap-1 border-b border-gray-300 pb-1"><ImageIcon size={14}/> Gambar & Vector</p>
+                  
+                  <div className="space-y-1.5">
+                    <button 
+                      onClick={() => imageInputRef.current?.click()} 
+                      className="w-full text-left p-1 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF] flex items-center justify-center gap-2"
+                    >
+                      <Download size={14} className="text-blue-600" />
+                      <span className="font-bold text-[11px]">Import Gambar Biasa</span>
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={imageInputRef} 
+                      className="hidden" 
+                      accept="image/jpeg, image/png, image/svg+xml, image/webp" 
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          handleImageImport(e.target.files[0]);
+                          e.target.value = '';
+                        }
+                      }} 
+                    />
+
+                    <button 
+                      onClick={() => setShowVectorConverter(true)} 
+                      className="w-full text-left p-1 bg-[#E0DFE3] border border-[#A0A0A0] hover:bg-[#D5E1F2] active:bg-[#A0A0A0] shadow-[inset_-1px_-1px_0_#999,inset_1px_1px_0_#FFF] flex items-center justify-center gap-2"
+                    >
+                      <Wand2 size={14} className="text-teal-600" />
+                      <span className="font-bold text-[11px]">Tracing ke Vector (B&W)</span>
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-gray-500 mt-1.5 leading-tight text-center">Tips: Anda juga bisa Drag & Drop file langsung ke kanvas.</p>
                 </div>
 
                 <div className="border border-[#A0A0A0] bg-[#F9F9F9] p-2">
@@ -737,40 +1001,7 @@ export default function EditorPage({
           </div>
         </div>
 
-        {/* ─── 7. VERTICAL COLOR PALETTE (Far Right) ─────────────────────── */}
-        <div className="w-10 bg-[#F0F0F0] border-l border-[#A0A0A0] flex flex-col items-center py-1 gap-0.5 overflow-y-auto" style={{boxShadow: "inset 1px 0 0 #FFF"}}>
-          <div className="w-6 h-6 border border-gray-400 bg-white relative cursor-pointer" onClick={() => handleColorClick("transparent")} title="No Fill">
-            <div className="absolute inset-0 flex items-center justify-center">
-               <div className="w-full h-px bg-red-500 transform rotate-45"></div>
-               <div className="w-full h-px bg-red-500 transform -rotate-45"></div>
-            </div>
-          </div>
-          {/* AI Suggested Palette Colors */}
-          {project.palette && (
-             <div className="flex flex-col gap-0.5 mb-1 pb-1 border-b border-[#A0A0A0] w-full items-center">
-               {[project.palette.primary, project.palette.secondary, project.palette.accent].map(color => (
-                 <div 
-                  key={"ai-"+color} 
-                  className="w-6 h-6 border border-gray-400 cursor-pointer shadow-sm hover:border-black relative" 
-                  style={{backgroundColor: color}}
-                  onClick={() => handleColorClick(color)}
-                  title={`AI Recommended: ${color}`}
-                >
-                  <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-yellow-400 border-b border-l border-gray-500"></div>
-                </div>
-               ))}
-             </div>
-          )}
-          {CORE_COLORS.map(color => (
-            <div 
-              key={color} 
-              className="w-6 h-6 border border-gray-400 cursor-pointer shadow-sm hover:border-black" 
-              style={{backgroundColor: color}}
-              onClick={() => handleColorClick(color)}
-              title={color}
-            />
-          ))}
-        </div>
+        {/* Removed Vertical Color Palette since colors are restricted by print method */}
       </div>
 
       {/* ─── 8. STATUS BAR (Bottom) ──────────────────────────────────────── */}
@@ -781,7 +1012,7 @@ export default function EditorPage({
         <div className="w-px h-4 bg-[#A0A0A0] border-r border-[#FFF]"></div>
         <span>
           {selectedEl 
-            ? `${selectedEl.type === 'text' ? 'Artistic Text' : selectedEl.shapeType || 'Object'} on Layer 1` 
+            ? `${selectedEl.type === 'text' ? 'Artistic Text' : selectedEl.type === 'custom_svg' ? 'Vector Object' : selectedEl.shapeType || 'Object'} on Layer 1` 
             : 'No object selected'}
         </span>
         <div className="w-px h-4 bg-[#A0A0A0] border-r border-[#FFF] ml-auto"></div>
@@ -791,6 +1022,15 @@ export default function EditorPage({
         </span>
       </div>
 
+      {/* MODALS */}
+      {showVectorConverter && (
+        <ImageToVectorConverter
+          onClose={() => setShowVectorConverter(false)}
+          onInsertSVG={(svgString) => {
+            addElement('custom_svg', { customSvg: svgString, color: '#000000', width: 30, height: 30 });
+          }}
+        />
+      )}
     </div>
   );
 }

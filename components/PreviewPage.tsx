@@ -88,24 +88,48 @@ function SvgElement({ el }: { el: DesignProject["elements"][number] }) {
     );
   }
 
+  if (el.type === "custom_svg" && el.customSvg) {
+    return (
+      <g dangerouslySetInnerHTML={{ 
+        __html: el.customSvg
+          .replace(/fill="[^"]*"/g, `fill="${el.color || '#000000'}"`)
+          .replace(/<svg([^>]*)>/, (match, p1) => {
+            let attrs = p1.replace(/\s(x|y|width|height)="[^"]*"/g, '');
+            if (!attrs.includes("preserveAspectRatio")) {
+              attrs += ' preserveAspectRatio="xMidYMid meet"';
+            }
+            return `<svg x="${el.x}%" y="${el.y}%" width="${el.width}%" height="${el.height}%" ${attrs} overflow="visible">`;
+          })
+      }} />
+    );
+  }
+
+  if (el.type === "image" && el.imageUrl) {
+    return (
+      <image x={ex} y={ey} width={ew} height={eh} href={el.imageUrl} preserveAspectRatio="none" />
+    );
+  }
+
   return null;
 }
 
 /** Kanvas desain SVG yang bisa digunakan di flat dan 3D view */
-function DesignCanvas({ project, width, height, borderRadius = 8 }: {
+function DesignCanvas({ project, width, height, borderRadius = 8, isExport = false }: {
   project: DesignProject;
   width: number;
   height: number;
   borderRadius?: number;
+  isExport?: boolean;
 }) {
   const sorted = [...project.elements].sort((a, b) => a.zIndex - b.zIndex);
+  const isSizeB = project.printSize === "Size B (17x23cm)";
   return (
     <div
       style={{
         width,
         height,
         borderRadius,
-        backgroundColor: project.backgroundColor || "#ffffff",
+        backgroundColor: project.materialColor || project.backgroundColor || "#ffffff",
         overflow: "hidden",
         position: "relative",
       }}
@@ -117,10 +141,31 @@ function DesignCanvas({ project, width, height, borderRadius = 8 }: {
           background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 55%, rgba(0,0,0,0.04) 100%)",
         }}
       />
-      <svg className="absolute inset-0 w-full h-full" aria-hidden="true">
+      
+      {/* Tekstur Bahan SVG Overlay */}
+      <svg className="absolute inset-0 pointer-events-none w-full h-full opacity-60 mix-blend-multiply" style={{ zIndex: 11 }}>
+        <filter id="leather-texture-preview">
+          <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" result="noise" />
+          <feColorMatrix type="matrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   0 0 0 0.3 0" />
+        </filter>
+        <rect width="100%" height="100%" filter="url(#leather-texture-preview)" />
+      </svg>
+
+      <svg className="absolute inset-0 w-full h-full" aria-hidden="true" style={{zIndex: 20}}>
         {sorted.map((el) => (
           <SvgElement key={el.id} el={el} />
         ))}
+        {!isExport && (
+          <image
+            href="/mika-nama.png"
+            x={isSizeB ? '11.76%' : '21.73%'}
+            y={isSizeB ? '50%' : '66.17%'}
+            width={isSizeB ? '76.47%' : '56.52%'}
+            height={isSizeB ? '19.56%' : '13.23%'}
+            preserveAspectRatio="none"
+            pointerEvents="none"
+          />
+        )}
       </svg>
     </div>
   );
@@ -153,9 +198,11 @@ function ThreeDMockup({ project }: { project: DesignProject }) {
     mouseY.set(0);
   };
 
-  // A4 aspect ratio: 210:297 ≈ 0.707
+  // Aspect ratio based on size
+  const isSizeB = project.printSize === "Size B (17x23cm)";
+  const ratio = isSizeB ? (17 / 23) : (23 / 34);
   const cardW = 300;
-  const cardH = Math.round(cardW / 0.707);
+  const cardH = Math.round(cardW / ratio);
 
   return (
     <div
@@ -251,10 +298,12 @@ function ThreeDMockup({ project }: { project: DesignProject }) {
 export default function PreviewPage({ project, onBackToEditor }: PreviewPageProps) {
   const [mode, setMode] = useState<"3d" | "flat">("3d");
 
-  const generateHighResFile = (format: "png" | "pdf") => {
+  const generateHighResFile = async (format: "png" | "pdf") => {
     const scaleFactor = 2;
+    const isSizeB = project.printSize === "Size B (17x23cm)";
+    const ratio = isSizeB ? (17 / 23) : (23 / 34);
     const baseW = 800;
-    const baseH = 1130;
+    const baseH = Math.round(baseW / ratio);
     const canvasW = baseW * scaleFactor;
     const canvasH = baseH * scaleFactor;
 
@@ -264,12 +313,12 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.fillStyle = project.backgroundColor || "#ffffff";
+    ctx.fillStyle = project.materialColor || project.backgroundColor || "#ffffff";
     ctx.fillRect(0, 0, canvasW, canvasH);
 
     const sorted = [...project.elements].sort((a, b) => a.zIndex - b.zIndex);
 
-    sorted.forEach((el) => {
+    for (const el of sorted) {
       ctx.save();
       const drawX = (el.x / 100) * canvasW;
       const drawY = (el.y / 100) * canvasH;
@@ -300,9 +349,38 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
         ctx.textBaseline = "top";
         const tx = el.align === "center" ? drawX + drawW / 2 : el.align === "right" ? drawX + drawW : drawX;
         ctx.fillText(el.text, tx, drawY);
+      } else if (el.type === "image" && el.imageUrl) {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, drawX, drawY, drawW, drawH);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = el.imageUrl!;
+        });
+      } else if (el.type === "custom_svg" && el.customSvg) {
+        let str = el.customSvg.replace(/fill="[^"]*"/g, `fill="${el.color || '#000000'}"`);
+        str = str.replace(/<svg([^>]*)>/, (match, p1) => {
+          let attrs = p1.replace(/\s(x|y|width|height)="[^"]*"/g, '');
+          if (!attrs.includes("preserveAspectRatio")) {
+            attrs += ' preserveAspectRatio="xMidYMid meet"';
+          }
+          return `<svg width="${drawW}" height="${drawH}" ${attrs}>`;
+        });
+        
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, drawX, drawY, drawW, drawH);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(str)}`;
+        });
       }
       ctx.restore();
-    });
+    }
 
     if (format === "png") {
       const a = document.createElement("a");
@@ -314,9 +392,10 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
     }
   };
 
-  // A4 flat preview dimensions
+  const isSizeB = project.printSize === "Size B (17x23cm)";
+  const ratio = isSizeB ? (17 / 23) : (23 / 34);
   const flatW = 280;
-  const flatH = Math.round(flatW / 0.707);
+  const flatH = Math.round(flatW / ratio);
 
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col" id="preview-page-wrapper">
@@ -411,9 +490,9 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
                 Spesifikasi Cetak
               </h3>
               {[
-                ["Ukuran", "A4 (210 × 297 mm)"],
-                ["Jenis Kertas", "Laminating Doff / Glossy 310g"],
-                ["Sistem Warna", "CMYK (Siap Cetak)"],
+                ["Ukuran", project.printSize || "Size A (23x34cm)"],
+                ["Jenis Kertas", "Bahan Sintetis (ASE)"],
+                ["Metode Cetak", project.printMethod || "Embos Foil"],
                 ["Konsep", project.concept],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between items-center text-xs">
@@ -435,20 +514,34 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
               </div>
             )}
 
-            {/* Color Palette */}
-            {project.palette && (
+            {/* Material Colors */}
+            {project.materialColor && (
               <div>
-                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2">Palet Warna</p>
+                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2">Bahan & Tinta</p>
                 <div className="flex gap-2">
-                  {[project.palette.primary, project.palette.secondary, project.palette.accent].map((color) => (
-                    <div key={color} className="flex-1 flex flex-col items-center gap-1">
+                  <div className="flex-1 flex flex-col items-center gap-1">
+                    <div
+                      className="w-full h-8 rounded-lg border border-stone-200 shadow-inner"
+                      style={{ backgroundColor: project.materialColor }}
+                    />
+                    <span className="text-[9px] font-mono text-stone-400">Dasar</span>
+                  </div>
+                  <div className="flex-1 flex flex-col items-center gap-1">
+                    <div
+                      className="w-full h-8 rounded-lg border border-stone-200 shadow-inner"
+                      style={{ backgroundColor: project.printMethod === "Embos Foil" ? "#D4AF37" : "#FFFFFF" }}
+                    />
+                    <span className="text-[9px] font-mono text-stone-400">Tinta 1</span>
+                  </div>
+                  {project.printMethod === "Sablon" && (
+                    <div className="flex-1 flex flex-col items-center gap-1">
                       <div
                         className="w-full h-8 rounded-lg border border-stone-200 shadow-inner"
-                        style={{ backgroundColor: color }}
+                        style={{ backgroundColor: "#111111" }}
                       />
-                      <span className="text-[9px] font-mono text-stone-400">{color}</span>
+                      <span className="text-[9px] font-mono text-stone-400">Tinta 2</span>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             )}

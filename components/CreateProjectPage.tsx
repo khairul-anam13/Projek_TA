@@ -1,78 +1,76 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, ArrowLeft, BookOpen, ChevronRight, HelpCircle } from "lucide-react";
-import { ProductType } from "../lib/types";
+import { Sparkles, ArrowLeft, BookOpen, ChevronRight, PenTool } from "lucide-react";
+import { MockupType, ProductType } from "../lib/types";
 
 interface CreateProjectPageProps {
   initialProductType: ProductType;
   onBack: () => void;
-  onGenerateAi: (formData: {
-    name: string;
-    category: string;
-    audience: string;
-    concept: string;
-    productType: ProductType;
-  }) => void;
+  onSkipAi: (formData: any) => void;
+  onGenerateAi: (formData: any) => void;
 }
 
-const CATEGORY_SUGGESTIONS = [
-  "Teknologi",
-  "Pendidikan",
-  "Kuliner (F&B)",
-  "Fashion & Style",
-  "Kesehatan & Medis",
-  "Jasa Profesional",
-  "Karya Kreatif",
-  "Toko UMKM"
-];
-
-const CONCEPT_SUGGESTIONS = [
-  "Minimalist & Clean",
-  "Elegant & Premium",
-  "Bold & Modern",
-  "Corporate & Formal",
-  "Playful & Creative",
-  "Retro & Vintage"
-];
+const MOCKUPS: MockupType[] = ["Rapor SD", "Rapor SMP", "Rapor SMA/SMK", "Rapor MAN"];
 
 export default function CreateProjectPage({
   initialProductType,
   onBack,
+  onSkipAi,
   onGenerateAi,
 }: CreateProjectPageProps) {
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
-  const [audience, setAudience] = useState("");
-  const [concept, setConcept] = useState(CONCEPT_SUGGESTIONS[0]);
-  // Untuk saat ini hanya Sampul Rapor yang tersedia
-  const productType: ProductType = "Sampul Rapor";
+  const [mockupType, setMockupType] = useState<MockupType>("Rapor SD");
+  
+  // Dynamic fields
+  const [judulRapor, setJudulRapor] = useState("RAPOR PESERTA DIDIK");
+  const [namaSekolah, setNamaSekolah] = useState("");
+  const [alamatSekolah, setAlamatSekolah] = useState("");
+  const [subInformasi, setSubInformasi] = useState("");
+
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
+  const [isUsingAi, setIsUsingAi] = useState(true);
 
   // Rotating tips shown during the AI generation process
   const loadingTips = [
-    "Menganalisis kategori bisnis untuk penyelarasan warna...",
-    "Merelasikan font Display & Body agar sesuai dengan target konsumen...",
-    "Gemini AI sedang menyusun slogan kampanye promosi yang berkelas...",
-    "Memformulasikan komposisi layout terbaik untuk cetak produk...",
+    "Menyesuaikan grid dan layout dengan format cetak standar...",
+    "Merelasikan font Display & Body agar pas dengan margin mockup...",
+    "Gemini AI sedang menyusun komposisi teks terbaik...",
+    "Memformulasikan tata letak agar presisi dengan ukuran A4/F4...",
     "Menyelesaikan paket rekomendasi desain high-fidelity Anda..."
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setError("Nama Usaha / Sekolah wajib diisi.");
-      return;
+  const handleValidation = () => {
+    if (!namaSekolah.trim()) {
+      setError("Nama Sekolah wajib diisi.");
+      return false;
     }
-    if (!category.trim()) {
-      setError("Kategori Bisnis / Bidang wajib diisi.");
-      return;
-    }
-
     setError("");
+    return true;
+  };
+
+  const formData = {
+    mockupType,
+    dynamicData: {
+      judulRapor,
+      namaSekolah,
+      alamatSekolah,
+      subInformasi
+    }
+  };
+
+  const handleSkipAi = () => {
+    if (!handleValidation()) return;
+    onSkipAi(formData);
+  };
+
+  const handleSubmitAi = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!handleValidation()) return;
+
     setIsSubmitting(true);
+    setIsUsingAi(true);
 
     // Tip rotation timer
     const interval = setInterval(() => {
@@ -80,215 +78,177 @@ export default function CreateProjectPage({
     }, 1500);
 
     // Call dynamic AI generator
-    setTimeout(() => {
+    setTimeout(async () => {
       clearInterval(interval);
-      onGenerateAi({
-        name,
-        category,
-        audience,
-        concept,
-        productType
-      });
+      await onGenerateAi(formData);
       setIsSubmitting(false);
     }, 6000);
   };
 
-  if (isSubmitting) {
+  if (isSubmitting && isUsingAi) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white" id="ai-loading-screen">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(59,130,246,0.25),transparent_50%)]" />
         <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:24px_24px]" />
+        
+        <div className="relative z-10 flex flex-col items-center text-center max-w-lg w-full">
+          <div className="w-20 h-20 bg-slate-800/80 rounded-2xl flex items-center justify-center mb-8 shadow-2xl border border-slate-700/50 backdrop-blur-sm relative">
+            <div className="absolute inset-0 rounded-2xl border-2 border-teal-500/30 animate-ping" />
+            <Sparkles className="w-10 h-10 text-teal-400 animate-pulse" />
+          </div>
 
-        <div className="relative max-w-md w-full text-center z-10">
-          {/* Animated glow orb */}
-          <div className="relative w-28 h-28 mx-auto mb-8">
-            <div className="absolute inset-0 bg-blue-500 rounded-full blur-2xl opacity-40 animate-pulse" />
-            <div className="w-24 h-24 bg-slate-800 rounded-3xl border-2 border-blue-400 flex items-center justify-center shadow-2xl mx-auto animate-spin-slow">
-              <Sparkles className="w-12 h-12 text-blue-400 animate-pulse" />
+          <h2 className="text-2xl font-bold mb-3 tracking-tight text-slate-100">AI Mengenerate Tata Letak</h2>
+          
+          <div className="w-full bg-slate-800/50 rounded-full h-2 mb-6 border border-slate-700/50 overflow-hidden">
+            <div 
+              className="bg-gradient-to-r from-teal-500 via-blue-500 to-teal-400 h-2 rounded-full transition-all duration-1000 ease-out relative"
+              style={{ width: `${Math.max(15, (loadingStep / loadingTips.length) * 100)}%` }}
+            >
+              <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_1s_infinite]" />
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold font-display-space tracking-tight">
-            Menghubungi Desainer AI
-          </h2>
-          <p className="text-slate-400 text-xs mt-1.5 font-mono">
-            POWERED BY GEMINI 3.5 FLASH
+          <p className="text-sm text-slate-400 font-medium h-6 animate-pulse">
+            {loadingTips[loadingStep] || loadingTips[loadingTips.length - 1]}
           </p>
-
-          {/* Loader bar */}
-          <div className="mt-8 bg-slate-800 h-2 rounded-full overflow-hidden w-full max-w-sm mx-auto">
-            <div
-              className="bg-blue-500 h-full rounded-full transition-all duration-1000"
-              style={{ width: `${((loadingStep + 1) / loadingTips.length) * 100}%` }}
-            />
-          </div>
-
-          {/* Tips paragraph */}
-          <p className="text-sm text-slate-300 font-medium mt-5 h-12 transition-all">
-            {loadingTips[loadingStep]}
-          </p>
-
-          <div className="mt-12 bg-slate-800/50 border border-slate-700/50 p-4 rounded-2xl text-[11px] text-slate-400 text-left">
-            💡 <strong className="text-slate-300">Tahukah Anda?</strong> AI memilih dari kombinasi skema warna offset CMYK percetakan profesional dan mencocokkannya secara dinamis dengan psikologi kategori bidang usaha yang Anda tentukan.
-          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col" id="create-project-layout">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200" id="create-project-navbar">
-        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div className="min-h-screen bg-stone-50 flex flex-col" id="create-project-page">
+      <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-6 h-16 flex items-center gap-4">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-950 cursor-pointer"
+            className="p-2 -ml-2 rounded-full hover:bg-stone-100 text-stone-500 transition-colors"
+            title="Kembali"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Kembali ke Dashboard</span>
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          
-          <div className="flex items-center gap-1.5">
-            <BookOpen className="w-4 h-4 text-teal-600" />
-            <span className="text-xs font-extrabold tracking-tight">PageFree</span>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+              <BookOpen className="w-4 h-4 text-teal-700" />
+            </div>
+            <h1 className="text-lg font-bold text-stone-800">Mockup Sampul Rapor</h1>
           </div>
         </div>
       </header>
 
-      {/* Main Form container */}
-      <main className="max-w-2xl w-full mx-auto px-4 py-10 flex-grow">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-10">
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2.5 bg-teal-50 text-teal-600 rounded-xl">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-stone-900">
-                  Buat Sampul Rapor Baru
-                </h1>
-                <p className="text-stone-500 text-xs mt-0.5">
-                  AI akan merekomendasikan desain terbaik berdasarkan informasi sekolah Anda.
-                </p>
-              </div>
-            </div>
+      <main className="flex-grow p-6 py-10" id="create-form-container">
+        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+          <div className="p-8 border-b border-stone-100 bg-gradient-to-br from-stone-50 to-white">
+            <h2 className="text-xl font-bold text-stone-800 mb-2">Pilih Jenis Mockup & Informasi</h2>
+            <p className="text-sm text-stone-500">
+              Data ini akan digunakan untuk menyusun tata letak (layout) dan tipografi sampul secara otomatis.
+            </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6" id="ai-generator-form">
+          <form onSubmit={handleSubmitAi} className="p-8 space-y-8">
             {error && (
-              <div className="p-3.5 bg-rose-50 text-rose-600 text-xs rounded-xl border border-rose-100 font-medium">
+              <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm font-medium">
+                <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
                 {error}
               </div>
             )}
 
-            {/* Hanya Sampul Rapor — indikator jenis produk */}
-            <div className="flex items-center gap-3 p-3.5 bg-teal-50 border border-teal-100 rounded-xl">
-              <span className="text-xl" role="img" aria-label="Sampul Rapor">📄</span>
+            <div className="space-y-6">
+              {/* Mockup Type Selection */}
               <div>
-                <span className="block text-xs font-bold text-teal-800">Sampul Rapor</span>
-                <span className="text-[10px] text-teal-600">Ukuran Standar A4 (210 × 297 mm)</span>
+                <label className="block text-sm font-bold text-stone-700 mb-2">Jenis Mockup</label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {MOCKUPS.map((m) => (
+                    <div
+                      key={m}
+                      onClick={() => setMockupType(m)}
+                      className={`px-4 py-3 rounded-xl border-2 cursor-pointer transition text-center text-sm font-semibold ${
+                        mockupType === m
+                          ? "border-teal-500 bg-teal-50 text-teal-700 shadow-sm"
+                          : "border-stone-200 text-stone-500 hover:border-stone-300 hover:bg-stone-50"
+                      }`}
+                    >
+                      {m}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Nama Sekolah */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-1.5" htmlFor="field-name">
-                Nama Sekolah / Instansi
-              </label>
-              <input
-                id="field-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Contoh: SMA Negeri 1 Yogyakarta"
-                className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm outline-none focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition-all text-stone-900 font-semibold"
-                required
-              />
-            </div>
+              <div className="h-px bg-stone-100 my-2" />
 
-            {/* Kategori Sekolah */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">
-                Jenjang / Bidang Sekolah
-              </label>
-              <input
-                type="text"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Contoh: SMA, SMK Jurusan RPL, SMP Negeri"
-                className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm outline-none focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition-all text-stone-900 font-semibold mb-2"
-                required
-              />
-              {/* Category Quick Suggestions */}
-              <div className="flex flex-wrap gap-1.5" id="category-pills">
-                {CATEGORY_SUGGESTIONS.map((catString) => (
-                  <button
-                    key={catString}
-                    type="button"
-                    onClick={() => setCategory(catString)}
-                    className="px-2.5 py-1 text-[10px] font-bold bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-full transition cursor-pointer"
-                  >
-                    {catString}
-                  </button>
-                ))}
+              {/* Dynamic Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-stone-700 mb-1.5">
+                    Judul Rapor
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition shadow-sm text-sm"
+                    value={judulRapor}
+                    onChange={(e) => setJudulRapor(e.target.value)}
+                    placeholder="Contoh: RAPOR PESERTA DIDIK"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-stone-700 mb-1.5">
+                    Nama Sekolah <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition shadow-sm text-sm font-semibold text-stone-800 placeholder:font-normal"
+                    value={namaSekolah}
+                    onChange={(e) => setNamaSekolah(e.target.value)}
+                    placeholder="Contoh: SMA NEGERI 1 JAKARTA"
+                    autoFocus
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Target Konsumen */}
-            <div>
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-500" htmlFor="field-audience">
-                  Nama Siswa / Kelas (Opsional)
+              <div>
+                <label className="block text-sm font-bold text-stone-700 mb-1.5">
+                  Alamat Sekolah
                 </label>
-                <span className="text-stone-300 cursor-help" title="Opsional: digunakan untuk melengkapi isi desain secara otomatis.">
-                  <HelpCircle className="w-3.5 h-3.5" />
-                </span>
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition shadow-sm text-sm"
+                  value={alamatSekolah}
+                  onChange={(e) => setAlamatSekolah(e.target.value)}
+                  placeholder="Contoh: Jl. Pendidikan No. 123, Kota X"
+                />
               </div>
-              <input
-                id="field-audience"
-                type="text"
-                value={audience}
-                onChange={(e) => setAudience(e.target.value)}
-                placeholder="Contoh: Siswa kelas XI, Tahun Pelajaran 2025/2026"
-                className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm outline-none focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition-all text-stone-900 font-medium"
-              />
-            </div>
 
-            {/* Konsep Desain */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                Pilih Arah Konsep Kreatif
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" id="concept-grid">
-                {CONCEPT_SUGGESTIONS.map((con) => (
-                  <button
-                    key={con}
-                    type="button"
-                    onClick={() => setConcept(con)}
-                    className={`px-3 py-2 text-xs font-semibold rounded-xl border text-center transition cursor-pointer ${
-                      concept === con
-                        ? "border-blue-600 bg-blue-50 text-blue-700"
-                        : "border-slate-200 hover:border-slate-300 text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {con}
-                  </button>
-                ))}
+              <div>
+                <label className="block text-sm font-bold text-stone-700 mb-1.5">
+                  Sub Informasi & Keterangan Tambahan
+                </label>
+                <textarea
+                  className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition shadow-sm text-sm h-24 resize-none"
+                  value={subInformasi}
+                  onChange={(e) => setSubInformasi(e.target.value)}
+                  placeholder="Contoh: NPSN: 12345678&#10;Tahun Pelajaran: 2026/2027&#10;Terakreditasi A"
+                />
               </div>
             </div>
 
-            {/* Submit Action Block */}
-            <div className="pt-4 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <span className="text-[11px] text-stone-400 font-medium">
-                Proses AI ±5 detik.
-              </span>
+            {/* Actions Block */}
+            <div className="pt-6 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleSkipAi}
+                className="px-5 py-2.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 font-semibold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transition"
+              >
+                <PenTool className="w-4 h-4" />
+                Lewati AI (Template Standar)
+              </button>
+
               <button
                 type="submit"
-                className="px-6 py-3 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transform transition active:scale-95"
+                className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transform transition active:scale-95"
               >
                 <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>Buat dengan AI</span>
+                <span>Gunakan AI untuk Layout</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

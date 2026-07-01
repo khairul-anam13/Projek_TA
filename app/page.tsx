@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { DesignProject, ProductType } from "../lib/types";
 import { DEFAULT_PROJECTS } from "../lib/templates";
+import { getMockupTemplate } from "../lib/mockupTemplates";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
@@ -38,12 +39,14 @@ export default function Home() {
   const [editingProject, setEditingProject] = useState<DesignProject | null>(null);
 
   // ── Form & AI State ───────────────────────────────────────────────────────
-  const [formParams, setFormParams] = useState({
-    name: "",
-    category: "",
-    audience: "",
-    concept: "",
-    productType: "Sampul Rapor" as ProductType,
+  const [formParams, setFormParams] = useState<any>({
+    mockupType: "Rapor SD",
+    dynamicData: {
+      judulRapor: "RAPOR PESERTA DIDIK",
+      namaSekolah: "",
+      alamatSekolah: "",
+      subInformasi: ""
+    }
   });
   const [aiRecommendation, setAiRecommendation] = useState<any>(null);
 
@@ -120,31 +123,72 @@ export default function Home() {
     setActiveView("create_project");
   };
 
-  const handleGenerateAiRecommendation = async (formPayload: any) => {
-    setFormParams(formPayload);
+  const handleGenerateAiRecommendation = async (formData: any) => {
     try {
-      const response = await fetch("/api/gemini", {
+      const res = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formPayload.name,
-          category: formPayload.category,
-          audience: formPayload.audience,
-          concept: formPayload.concept,
-          productType: formPayload.productType,
-        }),
+        body: JSON.stringify(formData),
       });
+      const data = await res.json();
 
-      const data = await response.json();
-      if (data.success && data.result) {
+      if (data.success) {
         setAiRecommendation(data.result);
       } else {
-        setAiRecommendation(getFallbackRecommendation(formPayload));
+        console.warn("AI generation error, using fallback.", data.error);
+        setAiRecommendation(getFallbackRecommendation(formData));
       }
-    } catch (e) {
-      setAiRecommendation(getFallbackRecommendation(formPayload));
+    } catch (err) {
+      console.warn("AI network error, using fallback.", err);
+      setAiRecommendation(getFallbackRecommendation(formData));
     }
     setActiveView("ai_recommendation");
+  };
+
+  const handleSkipAi = async (formData: any) => {
+    const newProjId = generateId("p");
+    const elements = getMockupTemplate(formData.mockupType, formData.dynamicData);
+    
+    const newProjectItem: DesignProject = {
+      id: newProjId,
+      name: formData.dynamicData.namaSekolah,
+      productType: "Sampul Rapor",
+      category: "Sekolah",
+      concept: "Formal",
+      audience: "Siswa",
+      backgroundColor: "#111111", // Default color 
+      printMethod: "Embos Foil",
+      printSize: "Size A (23x34cm)",
+      mockupType: formData.mockupType,
+      dynamicData: formData.dynamicData,
+      createdAt: new Date().toISOString(),
+      status: "Draft",
+      layoutType: "Modern Center",
+      slogan: "",
+      description: "",
+      elements,
+    };
+
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newProjectItem),
+      });
+
+      if (res.ok) {
+        const { project } = await res.json();
+        setProjects((prev) => [project, ...prev]);
+        setEditingProject(project);
+      } else {
+        setProjects((prev) => [newProjectItem, ...prev]);
+        setEditingProject(newProjectItem);
+      }
+    } catch {
+      setProjects((prev) => [newProjectItem, ...prev]);
+      setEditingProject(newProjectItem);
+    }
+    setActiveView("editor");
   };
 
   const handleUseDesignAndLaunchEditor = async () => {
@@ -153,29 +197,22 @@ export default function Home() {
     const newProjId = generateId("p");
     const newProjectItem: DesignProject = {
       id: newProjId,
-      name: formParams.name,
-      productType: formParams.productType,
-      category: formParams.category,
-      concept: formParams.concept,
-      audience: formParams.audience,
-      backgroundColor: aiRecommendation.color_palette.primary_color || "#0F172A",
-      slogan: aiRecommendation.slogan,
-      description: aiRecommendation.description,
+      name: formParams.dynamicData?.namaSekolah || "Proyek Baru",
+      productType: "Sampul Rapor",
+      category: "Sekolah",
+      concept: "Formal",
+      audience: "Siswa",
+      backgroundColor: "#111111", // Default color
+      printMethod: "Embos Foil",
+      printSize: "Size A (23x34cm)",
+      mockupType: formParams.mockupType,
+      dynamicData: formParams.dynamicData,
       createdAt: new Date().toISOString(),
       status: "Draft",
-      palette: {
-        primary: aiRecommendation.color_palette.primary_color,
-        secondary: aiRecommendation.color_palette.secondary_color,
-        accent: aiRecommendation.color_palette.accent_color,
-        explanation: aiRecommendation.color_palette.explanation,
-      },
-      typography: {
-        title: aiRecommendation.typography.title_font,
-        body: aiRecommendation.typography.body_font,
-        explanation: aiRecommendation.typography.explanation,
-      },
-      layoutType: aiRecommendation.layout,
-      elements: buildDefaultCanvasElements(formParams.name, aiRecommendation, formParams.productType),
+      layoutType: "AI Layout",
+      slogan: "",
+      description: aiRecommendation.description || "",
+      elements: aiRecommendation.layout_elements || [],
     };
 
     // Save to database
@@ -301,7 +338,7 @@ export default function Home() {
         explanation: "Display sans modern berpadu seimbang dengan body text yang nyaman dibaca.",
       },
       layout: "Corporate",
-      slogan: isCardProduct ? "Terbaik, Terpercaya, Selamanya." : "Cerdas, Berprestasi, Berkarakter Unggul.",
+      slogan: "Cerdas, Berprestasi, Berkarakter Unggul.",
       description: "Desain solid yang fokus pada kerapian margin, visibilitas tinggi, dan proporsi seimbang yang pas untuk kepentingan pencetakan massal.",
     };
   };
@@ -355,7 +392,14 @@ export default function Home() {
         <CreateProjectPage
           initialProductType={formParams.productType}
           onBack={() => setActiveView("dashboard")}
-          onGenerateAi={handleGenerateAiRecommendation}
+          onSkipAi={(data) => {
+            setFormParams(data);
+            handleSkipAi(data);
+          }}
+          onGenerateAi={(data) => {
+            setFormParams(data);
+            handleGenerateAiRecommendation(data);
+          }}
         />
       )}
 

@@ -1,5 +1,10 @@
-Perbaiki tampilan dan fitur:
--user dapat memilih ingin membuat apa di halaman dashboard jadi jangan hanya ada fitur rapot dan kartu nama, tapi memunculkan sesuai yang tersedia di web app. (untuk saat ini hanya smpul rapot dulu, jadi hapus kartu nama)
--ubah tampilan lebih simple agar ui dan ux lebih mudah untuk kalangan non tech,
--hapus branding yang membawa kata canva atau figma, ubah tema warna lebih halus .
--kembangkan fitur preview 3D lebih baik lagi dengan library yang sesuai
+ukuran rapot:
+A. 34cm x 23cm
+B. 23cm x 17cm
+
+di mockup nanti ada gambar mika nama berukuran 13cm x 4,5cm
+dengan peletakan sebagai berikut:
+- atas 7cm dari bawah
+- samping 5cm dari kiri
+- kanan 5cm dari kanan
+

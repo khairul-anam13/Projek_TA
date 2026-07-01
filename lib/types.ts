@@ -1,9 +1,11 @@
 export interface CanvasElement {
   id: string;
-  type: "text" | "shape" | "logo";
+  type: "text" | "shape" | "logo" | "custom_svg" | "image";
   text?: string;
   shapeType?: "rectangle" | "circle" | "triangle" | "line";
   logoIcon?: string;
+  customSvg?: string;
+  imageUrl?: string;
   x: number; // percentage coordinate (0 to 100)
   y: number; // percentage coordinate (0 to 100)
   width: number; // percentage of canvas width (0 to 100)
@@ -13,6 +15,7 @@ export interface CanvasElement {
   fontWeight?: "normal" | "medium" | "bold";
   color?: string;
   align?: "left" | "center" | "right";
+  isLockedX?: boolean;
   zIndex: number;
 }
 
@@ -21,6 +24,8 @@ export interface CanvasElement {
  * Tambahkan produk baru di sini untuk muncul di halaman dashboard.
  */
 export type ProductType = "Sampul Rapor";
+
+export type MockupType = "Rapor SD" | "Rapor SMP" | "Rapor SMA/SMK" | "Rapor MAN";
 
 export interface ProductCatalogItem {
   type: ProductType;
@@ -52,7 +57,12 @@ export interface DesignProject {
   category: string;
   concept: string;
   audience: string;
+  mockupType?: MockupType;
+  dynamicData?: Record<string, string>;
   backgroundColor: string;
+  materialColor?: string;
+  printSize?: "Size A (23x34cm)" | "Size B (17x23cm)";
+  printMethod?: "Embos Foil" | "Sablon";
   elements: CanvasElement[];
   slogan: string;
   description: string;
