@@ -35,30 +35,18 @@ flowchart TD
 
     M -- Tidak --> T[Load Template Default Mockup]
     T --> S
-
     H --> S
 
     S --> U[Halaman Editor]
     U --> V{Aksi Pengguna}
-    V -- Tambah Teks --> W[Insert Elemen Teks\nDefault: Terkunci di Tengah]
-    V -- Import Gambar --> X[Upload File JPG/PNG\nOtomatis Batas 30% Lebar Canvas]
-    V -- Edit Elemen --> Y[Ubah via Panel Properties\nFont, Warna, Posisi, Gembok]
-    V -- Hapus Elemen --> Z[Hapus dari Array Elements]
-    V -- Undo/Redo --> AA[Ambil State dari History Stack]
-
+    V -- Tambah atau Edit Elemen --> W[Manipulasi via Editor Canvas]
     W --> U
-    X --> U
-    Y --> U
-    Z --> U
-    AA --> U
-
     V -- Simpan --> AB[Simpan JSON ke Supabase DB]
     AB --> AC{Berhasil?}
     AC -- Ya --> AD[Tampil Notifikasi Sukses]
     AD --> U
     AC -- Tidak --> AE[Tampil Pesan Gagal]
     AE --> U
-
     V -- Preview --> AF[Halaman Preview & Mockup 3D]
     AF --> AG([Selesai])
 ```
@@ -137,7 +125,7 @@ graph TB
 
 ### 3.12.2 Activity Diagram
 
-Berikut adalah activity diagram yang dibuat secara terpisah untuk setiap fitur utama dalam sistem.
+Berikut adalah activity diagram per fitur/aktivitas utama dalam sistem.
 
 ---
 
@@ -161,7 +149,7 @@ flowchart TD
     M --> N[Klik Masuk]
     N --> O[Sistem Validasi via Supabase Auth]
     O --> P{Login Berhasil?}
-    P -- Tidak --> Q[Tampilkan Pesan Kredensial Salah]
+    P -- Tidak --> Q[Tampilkan Pesan Salah]
     Q --> M
     P -- Ya --> L
     L --> R([Selesai])
@@ -178,8 +166,8 @@ flowchart TD
     C --> D{Mockup Dipilih?}
     D -- Tidak --> C
     D -- Ya --> E[Isi Formulir Data Sekolah]
-    E --> F[Pilih Ukuran Cetak Size A atau Size B]
-    F --> G[Pilih Metode Cetak Embos Foil atau Sablon]
+    E --> F[Pilih Ukuran Cetak]
+    F --> G[Pilih Metode Cetak]
     G --> H{Gunakan AI?}
     H -- Ya --> I[Lanjut ke Alur Generate AI]
     H -- Tidak --> J[Load Template Default Mockup]
@@ -206,7 +194,7 @@ flowchart TD
     J --> K[Pengguna Kembali ke Form]
     K --> A
     H -- Ya --> L[Parse JSON Array]
-    L --> M[Validasi: Tidak Ada Elemen di Zona Mika]
+    L --> M[Validasi: Tidak Ada Elemen di Zona Mika Y50-80]
     M --> N[Render Elemen ke Canvas Editor]
     N --> O[Loading Hilang, Editor Tampil Penuh]
     O --> P([Selesai])
@@ -216,89 +204,80 @@ flowchart TD
 
 #### AD-04: Penggunaan Editor Canvas
 
-Diagram ini mencakup seluruh interaksi pengguna di dalam halaman Editor, termasuk penambahan elemen, manipulasi properti, pengaturan posisi, validasi zona mika, undo/redo, dan penyimpanan proyek.
+Diagram ini mencakup seluruh interaksi pengguna di dalam halaman Editor: penambahan elemen, manipulasi properti, pengaturan posisi, validasi zona mika, undo/redo, dan penyimpanan proyek.
 
 ```mermaid
 flowchart TD
     Start([Masuk ke Halaman Editor]) --> Loop{Pilih Aksi}
 
-    %% Tambah Elemen
     Loop -- Tambah Teks --> AT1[Buat Objek Elemen Teks]
     AT1 --> AT2[Hitung X = 50 - lebar/2\nSet isLockedX = true]
-    AT2 --> AT3[Set Default: fontSize 23,\nfontFamily, color, align center]
-    AT3 --> AT4[Tambah ke Array Elements\nPush ke History Stack]
-    AT4 --> Loop
+    AT2 --> AT3[Set Default: fontSize 23, fontFamily,\ncolor, align center]
+    AT3 --> Commit[Tambah ke Array Elements\nPush ke History Stack]
 
     Loop -- Tambah Logo --> AL1[Buat Objek Logo SVG]
-    AL1 --> AL2[Set isLockedX = true\nPosisi Tengah]
-    AL2 --> AT4
+    AL1 --> AL2[Set isLockedX = true, Posisi Tengah]
+    AL2 --> Commit
 
     Loop -- Import Gambar --> IMG1{Format Valid?\nJPG PNG SVG}
     IMG1 -- Tidak --> IMG2[Tampil Pesan Error Format]
     IMG2 --> Loop
     IMG1 -- Ya --> IMG3[Baca File via FileReader]
-    IMG3 --> IMG4{Lebar lebih\ndari 30 Persen?}
+    IMG3 --> IMG4{Lebar lebih dari 30 Persen?}
     IMG4 -- Ya --> IMG5[Skalakan Proporsional]
     IMG4 -- Tidak --> IMG6[Gunakan Ukuran Asli]
-    IMG5 --> AT4
-    IMG6 --> AT4
+    IMG5 --> Commit
+    IMG6 --> Commit
 
-    %% Edit Elemen
     Loop -- Klik Elemen --> SEL[Elemen Terpilih\nPanel Properties Tampil]
     SEL --> Aksi{Pilih Sub-Aksi}
 
-    Aksi -- Ubah Teks --> E1[Update field text pada Elemen]
-    Aksi -- Ubah Font Size --> E2[Pilih Hierarki:\n43 / 33 / 23 / 13 pt]
+    Aksi -- Ubah Teks --> E1[Update field text]
+    Aksi -- Ubah Font Size --> E2[Pilih: 43 / 33 / 23 / 13 pt]
     Aksi -- Ubah Warna --> E3{Metode Cetak?}
     E3 -- Embos Foil --> E3A[Paksa Emas #D4AF37]
     E3 -- Sablon --> E3B[Pilih Hitam atau Putih]
-    E3A --> Commit[Push ke History Stack]
+    E3A --> Commit
     E3B --> Commit
     E1 --> Commit
     E2 --> Commit
 
-    Aksi -- Buka atau Kunci Gembok --> E4{Status isLockedX?}
-    E4 -- true --> E4A[Set isLockedX = false\nElemen Bebas Bergerak]
-    E4 -- false --> E4B[Hitung X = 50 - lebar/2\nSet isLockedX = true]
+    Aksi -- Toggle Gembok --> E4{Status isLockedX?}
+    E4 -- true --> E4A[Set false, Elemen Bebas Bergerak]
+    E4 -- false --> E4B[Hitung X Tengah, Set true]
     E4A --> Commit
     E4B --> Commit
 
-    %% Drag & Drop
-    Aksi -- Geser via Drag --> DRG1[isDraggingRef = true]
-    DRG1 --> DRG2[Hitung dx dy dari Posisi Mouse]
+    Aksi -- Geser via Drag --> DRG1[Catat Posisi Awal]
+    DRG1 --> DRG2[Hitung delta dx dan dy]
     DRG2 --> DRG3{isLockedX aktif?}
     DRG3 -- Ya --> DRG4[Paksa tx = 50 - lebar/2]
     DRG3 -- Tidak --> DRG5[Gunakan tx Normal]
-    DRG4 --> DRG6[Cek Zona Mika]
+    DRG4 --> DRG6{ty masuk Y 50-80?}
     DRG5 --> DRG6
-    DRG6 --> DRG7{ty masuk Y 50-80?}
-    DRG7 -- Ya --> DRG8[Dorong ke Y 49 atau Y 81]
-    DRG7 -- Tidak --> DRG9[Posisi Diterima]
-    DRG8 --> DRG10[Update Posisi Elemen]
-    DRG9 --> DRG10
-    DRG10 --> DRG11{Mouse Dilepas?}
-    DRG11 -- Tidak --> DRG2
-    DRG11 -- Ya --> Commit
+    DRG6 -- Ya --> DRG7[Dorong ke Y 49 atau Y 81]
+    DRG6 -- Tidak --> DRG8[Posisi Diterima]
+    DRG7 --> DRG9{Mouse Dilepas?}
+    DRG8 --> DRG9
+    DRG9 -- Tidak --> DRG2
+    DRG9 -- Ya --> Commit
 
-    %% Hapus Elemen
     Aksi -- Hapus Elemen --> DEL1[Filter Array: Buang selectedId]
     DEL1 --> DEL2[Set selectedId = null]
     DEL2 --> Commit
 
     Commit --> Loop
 
-    %% Undo/Redo
     Loop -- Ctrl+Z Undo --> UND{History Ada?}
     UND -- Tidak --> Loop
-    UND -- Ya --> UND1[Ambil State Lama\nTerapkan ke Elements]
+    UND -- Ya --> UND1[Ambil State Lama, Terapkan ke Elements]
     UND1 --> Loop
 
     Loop -- Ctrl+Y Redo --> RED{Future Ada?}
     RED -- Tidak --> Loop
-    RED -- Ya --> RED1[Ambil State Berikutnya\nTerapkan ke Elements]
+    RED -- Ya --> RED1[Ambil State Berikutnya, Terapkan]
     RED1 --> Loop
 
-    %% Simpan
     Loop -- Simpan Ctrl+S --> SAV1[Serialisasi JSON Elements + Metadata]
     SAV1 --> SAV2[Kirim Upsert ke Supabase DB]
     SAV2 --> SAV3{Berhasil?}
@@ -307,7 +286,6 @@ flowchart TD
     SAV4 --> Loop
     SAV5 --> Loop
 
-    %% Keluar
     Loop -- Preview --> END1([Lanjut ke AD-05 Preview])
     Loop -- Kembali ke Dashboard --> END2([Selesai])
 ```
@@ -353,254 +331,6 @@ flowchart TD
     J --> K[Kartu Proyek Hilang dari Dashboard]
     K --> F
 ```
----
-
-
-
-
-
-
-    B -- Drag ke Canvas --> C[Event Drop Terdeteksi]
-    B -- Klik Tombol Import --> D[Buka Dialog File]
-    D --> E[Pengguna Pilih File]
-    E --> C
-    C --> F{Format Valid JPG PNG SVG?}
-    F -- Tidak --> G[Tampilkan Pesan Error Format]
-    G --> A
-    F -- Ya --> H[Baca File via FileReader API]
-    H --> I[Hitung Dimensi Gambar]
-    I --> J{Lebar lebih dari 30 persen Canvas?}
-    J -- Ya --> K[Skalakan Proporsional Maks 30 Persen]
-    J -- Tidak --> L[Gunakan Ukuran Asli]
-    K --> M[Set isLockedX = true, Posisi Tengah]
-    L --> M
-    M --> N[Tambah ke Array Elements sebagai type image]
-    N --> O[Push ke History Stack]
-    O --> P[Gambar Muncul di Canvas]
-    P --> Q([Selesai])
-```
-
----
-
-#### AD-06: Mengedit Konten Teks
-
-```mermaid
-flowchart TD
-    A([Mulai]) --> B[Klik Elemen Teks di Canvas]
-    B --> C[Panel Properties Terbuka]
-    C --> D[Pengguna Ubah Isi di Input Field Teks]
-    D --> E[Sistem Update Field text pada Objek Elemen]
-    E --> F[Canvas Re-render Teks Baru]
-    F --> G[Push Perubahan ke History Stack]
-    G --> H([Selesai])
-```
-
----
-
-#### AD-07: Mengubah Ukuran Font
-
-```mermaid
-flowchart TD
-    A([Mulai]) --> B[Klik Elemen Teks]
-    B --> C[Buka Panel Properties]
-    C --> D[Klik Field Ukuran Font]
-    D --> E{Pilih dari Hierarki Preset?}
-    E -- Ya --> F{Ukuran yang Dipilih}
-    F -- 43pt --> G[Judul Besar]
-    F -- 33pt --> H[Subjudul]
-    F -- 23pt --> I[Teks Sedang]
-    F -- 13pt --> J[Keterangan Kecil]
-    E -- Tidak --> K[Ketik Nilai Manual]
-    G --> L[Update fontSize pada Elemen]
-    H --> L
-    I --> L
-    J --> L
-    K --> L
-    L --> M[Canvas Re-render Ukuran Baru]
-    M --> N[Push ke History Stack]
-    N --> O([Selesai])
-```
-
----
-
-#### AD-08: Mengubah Warna Elemen
-
-```mermaid
-flowchart TD
-    A([Mulai]) --> B[Klik Elemen di Canvas]
-    B --> C[Buka Panel Properties Bagian Warna]
-    C --> D{Metode Cetak Proyek?}
-    D -- Embos Foil --> E[Hanya Tersedia Warna Emas]
-    E --> F[Pengguna Pilih Emas]
-    F --> G[Update color = D4AF37]
-    D -- Sablon --> H[Tersedia Hitam dan Putih]
-    H --> I{Pilih Warna}
-    I -- Hitam --> J[Update color = 000000]
-    I -- Putih --> K[Update color = FFFFFF]
-    J --> G
-    K --> G
-    G --> L[Canvas Re-render Warna Baru]
-    L --> M[Push ke History Stack]
-    M --> N([Selesai])
-```
-
----
-
-#### AD-09: Kunci dan Buka Gembok Sumbu X
-
-```mermaid
-flowchart TD
-    A([Mulai]) --> B[Klik Elemen di Canvas]
-    B --> C[Panel Properties Tampil]
-    C --> D{Status isLockedX?}
-    D -- true Terkunci --> E[Tampil Tombol Buka Gembok]
-    E --> F[Pengguna Klik Buka Gembok]
-    F --> G[Set isLockedX = false]
-    G --> H[Elemen Bebas Digeser Segala Arah]
-    D -- false Terbuka --> I[Tampil Tombol Kunci Tengah]
-    I --> J[Pengguna Klik Kunci Tengah]
-    J --> K[Hitung Ulang X = 50 - lebar dibagi 2]
-    K --> L[Set isLockedX = true]
-    L --> M[Elemen Terkunci di Posisi Tengah]
-    H --> N([Selesai])
-    M --> N
-```
-
----
-
-#### AD-10: Menggeser Elemen dengan Drag
-
-```mermaid
-flowchart TD
-    A([Mulai]) --> B[Pengguna Klik Tahan Elemen]
-    B --> C[isDraggingRef = true, Simpan Posisi Awal]
-    C --> D[Pengguna Gerakkan Mouse]
-    D --> E[Hitung Delta dx dan dy]
-    E --> F[Hitung Posisi Target tx dan ty]
-    F --> G{isLockedX aktif?}
-    G -- Ya --> H[Paksa tx = 50 - lebar dibagi 2]
-    G -- Tidak --> I[Gunakan tx Hasil Perhitungan]
-    H --> J[Periksa Zona Mika]
-    I --> J
-    J --> K{ty di antara 50 dan 80?}
-    K -- Ya --> L{ty kurang dari 65?}
-    L -- Ya --> M[Dorong ty = 49]
-    L -- Tidak --> N[Dorong ty = 81]
-    K -- Tidak --> O[ty Diterima]
-    M --> P[Update Posisi Elemen]
-    N --> P
-    O --> P
-    P --> Q{Mouse Dilepas?}
-    Q -- Tidak --> D
-    Q -- Ya --> R[isDraggingRef = false]
-    R --> S[Push State ke History Stack]
-    S --> T([Selesai])
-```
-
----
-
-#### AD-11: Undo dan Redo
-
-```mermaid
-flowchart TD
-    A([Mulai]) --> B{Aksi Pengguna}
-    B -- Ctrl+Z atau Klik Undo --> C{History Stack Ada?}
-    C -- Tidak --> D[Pesan: Tidak Ada Riwayat]
-    D --> A
-    C -- Ya --> E[Ambil State Sebelumnya]
-    E --> F[Terapkan ke Canvas Elements]
-    F --> G[Pindah ke Future Stack]
-    G --> H[Canvas Re-render]
-    H --> A
-    B -- Ctrl+Y atau Klik Redo --> I{Future Stack Ada?}
-    I -- Tidak --> J[Pesan: Tidak Ada Langkah ke Depan]
-    J --> A
-    I -- Ya --> K[Ambil State Berikutnya]
-    K --> L[Terapkan ke Canvas Elements]
-    L --> M[Push ke History Stack]
-    M --> N[Canvas Re-render]
-    N --> A
-```
-
----
-
-#### AD-12: Menyimpan Proyek
-
-```mermaid
-flowchart TD
-    A([Mulai]) --> B[Pengguna Klik Simpan atau Ctrl+S]
-    B --> C[Kumpulkan State Proyek: Elements, Warna, Ukuran]
-    C --> D[Serialisasi ke JSON]
-    D --> E[Kirim Upsert ke Supabase DB]
-    E --> F{Berhasil?}
-    F -- Tidak --> G[Tampil Toast Error]
-    G --> H[Pengguna Coba Lagi]
-    H --> B
-    F -- Ya --> I[Data Tersimpan di Tabel design_projects]
-    I --> J[Tampil Toast: Project Saved]
-    J --> K([Selesai])
-```
-
----
-
-#### AD-13: Menghapus Elemen di Canvas
-
-```mermaid
-flowchart TD
-    A([Mulai]) --> B[Klik Elemen di Canvas]
-    B --> C[selectedId Diset ke ID Elemen]
-    C --> D{Metode Hapus}
-    D -- Tekan Delete atau Backspace --> E[Event Keyboard Terdeteksi]
-    D -- Klik Ikon Hapus di Toolbar --> E
-    E --> F[Filter Array: Buang Elemen dengan ID = selectedId]
-    F --> G[Set selectedId = null]
-    G --> H[Push State ke History Stack]
-    H --> I[Canvas Re-render Tanpa Elemen]
-    I --> J([Selesai])
-```
-
----
-
-#### AD-14: Pratinjau Mockup 3D
-
-```mermaid
-flowchart TD
-    A([Mulai]) --> B[Klik Tombol Preview di Toolbar]
-    B --> C[Halaman Preview Dibuka]
-    C --> D[Ambil Data Proyek dari State]
-    D --> E[Render Canvas Desain 2D]
-    E --> F[Terapkan CSS 3D Transforms]
-    F --> G[Overlay Tekstur Bahan Sesuai material_color]
-    G --> H[Tampilkan Aset Mika di Koordinat Fisik]
-    H --> I[Aktifkan Listener Mouse Move]
-    I --> J[Hitung Rotasi dari Posisi Kursor]
-    J --> K[Update rotateX dan rotateY Real-time]
-    K --> L{Pengguna Klik Kembali?}
-    L -- Tidak --> J
-    L -- Ya --> M[Kembali ke Editor]
-    M --> N([Selesai])
-```
-
----
-
-#### AD-15: Menghapus Proyek dari Dashboard
-
-```mermaid
-flowchart TD
-    A([Mulai]) --> B[Klik Hapus pada Kartu Proyek]
-    B --> C[Tampilkan Dialog Konfirmasi]
-    C --> D{Konfirmasi Pengguna?}
-    D -- Batal --> E[Dialog Ditutup]
-    E --> F([Selesai])
-    D -- Ya, Hapus --> G[Kirim Request DELETE ke Supabase]
-    G --> H{Berhasil?}
-    H -- Tidak --> I[Tampil Pesan Error]
-    I --> F
-    H -- Ya --> J[Hapus Proyek dari State Lokal]
-    J --> K[Kartu Proyek Hilang dari Dashboard]
-    K --> F
-```
-
 
 ---
 
@@ -667,7 +397,7 @@ erDiagram
 | print_method | TEXT | NULL | Metode cetak (Embos Foil / Sablon) |
 | background_color | TEXT | DEFAULT '#1E3A8A' | Warna latar kanvas editor |
 | material_color | TEXT | NULL | Warna bahan ASE untuk pratinjau 3D |
-| elements | JSONB | NOT NULL, DEFAULT '[]' | Array objek elemen kanvas (lihat sub-skema) |
+| elements | JSONB | NOT NULL, DEFAULT '[]' | Array objek elemen kanvas |
 | palette | JSONB | NULL | Palet warna hasil rekomendasi AI |
 | typography | JSONB | NULL | Tipografi hasil rekomendasi AI |
 | layout_type | TEXT | NULL | Jenis layout (Modern Center, dll.) |
@@ -676,8 +406,6 @@ erDiagram
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | Waktu terakhir proyek diubah (auto-trigger) |
 
 **Sub-skema kolom `elements` (JSONB Array):**
-
-Setiap objek di dalam array `elements` mengikuti struktur berikut:
 
 | Field | Tipe | Keterangan |
 |---|---|---|
@@ -785,7 +513,6 @@ Berikut adalah rancangan tampilan (*wireframe*) dari tiap halaman utama aplikasi
 ```
 +------------------------------------------------------------------+
 |                                                                  |
-|                                                                  |
 |              [ Animasi Spinner / Gelombang ]                     |
 |                                                                  |
 |         AI sedang merancang tata letak desain Anda...            |
@@ -793,7 +520,6 @@ Berikut adalah rancangan tampilan (*wireframe*) dari tiap halaman utama aplikasi
 |         Memproses data sekolah                       [====  ]    |
 |         Menghitung koordinat elemen                  [======]    |
 |         Menyusun hierarki tipografi                  [===   ]    |
-|                                                                  |
 |                                                                  |
 +------------------------------------------------------------------+
 ```
@@ -815,7 +541,7 @@ Berikut adalah rancangan tampilan (*wireframe*) dari tiap halaman utama aplikasi
 | - Import Gambar               | |      || [Buka Gembok]          |
 |                               | |Desain||                        |
 | [Layers Docker]               | |      || [ Tipografi ]          |
-| - el_title                    | |      || Font: [Times New R. v] |
+| - el_title     (locked)       | |      || Font: [Times New R. v] |
 | - el_logo      (locked)       | |      || Teks: [............]   |
 | - el_school    (locked)       | |      || Size: [33 pt     v]    |
 | - el_address   (locked)       | |      || B I [ Rata Tengah ]    |
@@ -836,7 +562,6 @@ Berikut adalah rancangan tampilan (*wireframe*) dari tiap halaman utama aplikasi
 +------------------------------------------------------------------+
 |  < Kembali ke Editor                    [Print / Export PDF]     |
 +------------------------------------------------------------------+
-|                                                                  |
 |                                                                  |
 |             +================================+                   |
 |            /|  RAPOR PESERTA DIDIK           |                   |

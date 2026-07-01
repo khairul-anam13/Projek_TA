@@ -79,5 +79,5 @@ export interface DesignProject {
     body: string;
     explanation: string;
   };
-  layoutType?: "Modern Center" | "Minimalist" | "Corporate" | "Creative";
+  layoutType?: string;
 }

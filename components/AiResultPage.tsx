@@ -1,16 +1,18 @@
 "use client";
 
-import React from "react";
-import { Sparkles, ArrowLeft, Check, LayoutTemplate, AlignCenter, ChevronRight } from "lucide-react";
+import React, { useState } from "react";
+import { Sparkles, ArrowLeft, Check, LayoutTemplate, AlignCenter, ChevronRight, Info, MapPin } from "lucide-react";
 
 interface AiResultPageProps {
   formData: any;
   aiRecommendation: {
     description: string;
+    corrected_address?: string;
+    sub_information_options?: string[];
     layout_elements: any[];
   };
   onBack: () => void;
-  onUseDesign: () => void;
+  onUseDesign: (modifiedElements?: any[]) => void;
 }
 
 export default function AiResultPage({
@@ -19,6 +21,7 @@ export default function AiResultPage({
   onBack,
   onUseDesign,
 }: AiResultPageProps) {
+  const [selectedSubInfoIdx, setSelectedSubInfoIdx] = useState(0);
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col" id="ai-result-layout">
       {/* Header */}
@@ -99,6 +102,43 @@ export default function AiResultPage({
 
           {/* RIGHT: Mockup preview and Action */}
           <div className="lg:col-span-4 space-y-6">
+            {aiRecommendation.corrected_address && (
+              <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3 text-sm shadow-sm">
+                 <div className="text-amber-500 mt-0.5"><MapPin size={18} /></div>
+                 <div>
+                   <h4 className="font-bold text-amber-800 text-xs uppercase mb-1">Koreksi Alamat AI</h4>
+                   <p className="text-amber-900 font-medium text-xs leading-relaxed">
+                     Alamat yang Anda masukkan berbeda dari data web. AI telah mengoreksinya menjadi: <br/>
+                     <span className="font-bold mt-1 block">{aiRecommendation.corrected_address}</span>
+                   </p>
+                 </div>
+              </div>
+            )}
+
+            {aiRecommendation.sub_information_options && aiRecommendation.sub_information_options.length > 0 && (
+              <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <Info className="w-5 h-5 text-teal-600" />
+                  <h3 className="font-bold text-slate-900 text-sm tracking-tight uppercase">Opsi Sub Informasi</h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-4">Pilih salah satu rekomendasi AI untuk informasi tambahan:</p>
+                <div className="space-y-2">
+                  {aiRecommendation.sub_information_options.map((opt, idx) => (
+                    <label key={idx} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedSubInfoIdx === idx ? 'bg-teal-50 border-teal-500' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
+                      <input 
+                        type="radio" 
+                        name="subInfoOption" 
+                        className="mt-0.5 text-teal-600 focus:ring-teal-500" 
+                        checked={selectedSubInfoIdx === idx}
+                        onChange={() => setSelectedSubInfoIdx(idx)}
+                      />
+                      <span className={`text-xs font-medium ${selectedSubInfoIdx === idx ? 'text-teal-900' : 'text-slate-700'}`}>{opt}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden flex flex-col justify-between" style={{ minHeight: '320px' }}>
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20" />
               
@@ -113,7 +153,15 @@ export default function AiResultPage({
               </div>
 
               <button
-                onClick={onUseDesign}
+                onClick={() => {
+                  let modifiedElements = [...aiRecommendation.layout_elements];
+                  if (aiRecommendation.sub_information_options && aiRecommendation.sub_information_options[selectedSubInfoIdx]) {
+                    modifiedElements = modifiedElements.map(el => 
+                      el.id === 'el_sub_info' ? { ...el, text: aiRecommendation.sub_information_options![selectedSubInfoIdx] } : el
+                    );
+                  }
+                  onUseDesign(modifiedElements);
+                }}
                 className="relative z-10 w-full py-4 bg-white hover:bg-blue-50 text-blue-700 active:bg-blue-100 font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition transform active:scale-95"
               >
                 <Check className="w-5 h-5" />

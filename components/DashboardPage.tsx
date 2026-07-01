@@ -62,8 +62,8 @@ export default function DashboardPage({
         <div className="max-w-5xl mx-auto px-5 h-16 flex items-center justify-between">
           {/* Brand */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center">
-              <BookOpen className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden shadow-sm">
+              <img src="/pagefree.png" alt="Page Free Logo" className="w-full h-full object-cover bg-white" />
             </div>
             <span className="font-bold text-base text-stone-900 tracking-tight">
               Page<span className="text-teal-600">Free</span>

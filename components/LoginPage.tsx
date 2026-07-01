@@ -35,8 +35,8 @@ export default function LoginPage() {
       <div className="lg:col-span-5 flex flex-col justify-between p-8 sm:p-12 lg:p-16 bg-white shadow-xl z-10" id="login-sidebar">
         {/* Brand Header */}
         <div className="flex items-center gap-3" id="brand-header">
-          <div className="p-2.5 bg-blue-600 rounded-xl text-white shadow-md shadow-blue-200" id="logo-icon-container">
-            <Printer className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md" id="logo-icon-container">
+            <img src="/pagefree.png" alt="Page Free Logo" className="w-full h-full object-cover bg-white" />
           </div>
           <div>
             <span className="font-extrabold text-xl tracking-tight text-slate-900">

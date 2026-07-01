@@ -191,7 +191,7 @@ export default function Home() {
     setActiveView("editor");
   };
 
-  const handleUseDesignAndLaunchEditor = async () => {
+  const handleUseDesignAndLaunchEditor = async (modifiedElements?: any[]) => {
     if (!aiRecommendation) return;
 
     const newProjId = generateId("p");
@@ -212,7 +212,7 @@ export default function Home() {
       layoutType: "AI Layout",
       slogan: "",
       description: aiRecommendation.description || "",
-      elements: aiRecommendation.layout_elements || [],
+      elements: modifiedElements || aiRecommendation.layout_elements || [],
     };
 
     // Save to database
@@ -396,9 +396,9 @@ export default function Home() {
             setFormParams(data);
             handleSkipAi(data);
           }}
-          onGenerateAi={(data) => {
+          onGenerateAi={async (data) => {
             setFormParams(data);
-            handleGenerateAiRecommendation(data);
+            await handleGenerateAiRecommendation(data);
           }}
         />
       )}

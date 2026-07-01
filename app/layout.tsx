@@ -30,6 +30,9 @@ const playfairDisplay = Playfair_Display({
 export const metadata: Metadata = {
   title: 'Page Free - Professional Printing Design Assistant',
   description: 'Aplikasi berbasis web pembuat desain produk percetakan seperti kartu nama dan sampul rapor dengan bantuan rekomendasi AI.',
+  icons: {
+    icon: '/pagefree.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

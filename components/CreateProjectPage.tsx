@@ -61,12 +61,16 @@ export default function CreateProjectPage({
   };
 
   const handleSkipAi = () => {
+    if (isSubmitting) return;
     if (!handleValidation()) return;
+    setIsSubmitting(true);
+    setIsUsingAi(false);
     onSkipAi(formData);
   };
 
-  const handleSubmitAi = (e: React.FormEvent) => {
+  const handleSubmitAi = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!handleValidation()) return;
 
     setIsSubmitting(true);
@@ -75,14 +79,20 @@ export default function CreateProjectPage({
     // Tip rotation timer
     const interval = setInterval(() => {
       setLoadingStep((prev) => (prev < loadingTips.length - 1 ? prev + 1 : prev));
-    }, 1500);
+    }, 2500);
 
-    // Call dynamic AI generator
-    setTimeout(async () => {
-      clearInterval(interval);
+    // Force React to render the full-screen loading state before we do anything else
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    try {
       await onGenerateAi(formData);
+    } catch (err) {
+      console.error(err);
+      setError("Gagal menghasilkan tata letak AI.");
+    } finally {
+      clearInterval(interval);
       setIsSubmitting(false);
-    }, 6000);
+    }
   };
 
   if (isSubmitting && isUsingAi) {
@@ -128,10 +138,10 @@ export default function CreateProjectPage({
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
-              <BookOpen className="w-4 h-4 text-teal-700" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden shadow-sm">
+              <img src="/pagefree.png" alt="Page Free Logo" className="w-full h-full object-cover bg-white" />
             </div>
-            <h1 className="text-lg font-bold text-stone-800">Mockup Sampul Rapor</h1>
+            <h1 className="text-lg font-bold text-stone-800">PageFree</h1>
           </div>
         </div>
       </header>
@@ -237,7 +247,8 @@ export default function CreateProjectPage({
               <button
                 type="button"
                 onClick={handleSkipAi}
-                className="px-5 py-2.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 font-semibold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transition"
+                disabled={isSubmitting}
+                className="px-5 py-2.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 font-semibold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <PenTool className="w-4 h-4" />
                 Lewati AI (Template Standar)
@@ -245,11 +256,19 @@ export default function CreateProjectPage({
 
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transform transition active:scale-95"
+                disabled={isSubmitting}
+                className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transform transition active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
               >
-                <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>Gunakan AI untuk Layout</span>
-                <ChevronRight className="w-4 h-4" />
+                {isSubmitting ? (
+                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                )}
+                <span>{isSubmitting ? "Memproses..." : "Gunakan AI untuk Layout"}</span>
+                {!isSubmitting && <ChevronRight className="w-4 h-4" />}
               </button>
             </div>
           </form>
