@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { DesignProject } from "@/lib/types";
+import { mapRowToProject, mapProjectToRow } from "@/lib/supabase/projectMapper";
 
 /**
  * GET /api/projects/[id]
@@ -36,25 +37,7 @@ export async function GET(
     return NextResponse.json({ error: "Proyek tidak ditemukan." }, { status: 404 });
   }
 
-  const project: DesignProject = {
-    id: data.id,
-    name: data.name,
-    productType: data.product_type,
-    category: data.category,
-    concept: data.concept,
-    audience: data.audience,
-    backgroundColor: data.background_color,
-    slogan: data.slogan,
-    description: data.description,
-    createdAt: data.created_at,
-    status: data.status,
-    palette: data.palette ?? undefined,
-    typography: data.typography ?? undefined,
-    layoutType: data.layout_type ?? undefined,
-    elements: data.elements ?? [],
-  };
-
-  return NextResponse.json({ project });
+  return NextResponse.json({ project: mapRowToProject(data) });
 }
 
 /**
@@ -82,22 +65,7 @@ export async function PUT(
 
   const { data, error } = await supabase
     .from("design_projects")
-    .update({
-      name: body.name,
-      product_type: body.productType,
-      category: body.category,
-      concept: body.concept,
-      audience: body.audience,
-      background_color: body.backgroundColor,
-      slogan: body.slogan,
-      description: body.description,
-      status: body.status,
-      palette: body.palette ?? null,
-      typography: body.typography ?? null,
-      layout_type: body.layoutType ?? null,
-      elements: body.elements,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ ...mapProjectToRow(body), updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("user_id", user.id) // Double-check ownership (defense in depth)
     .select()
@@ -111,25 +79,7 @@ export async function PUT(
     );
   }
 
-  const updated: DesignProject = {
-    id: data.id,
-    name: data.name,
-    productType: data.product_type,
-    category: data.category,
-    concept: data.concept,
-    audience: data.audience,
-    backgroundColor: data.background_color,
-    slogan: data.slogan,
-    description: data.description,
-    createdAt: data.created_at,
-    status: data.status,
-    palette: data.palette ?? undefined,
-    typography: data.typography ?? undefined,
-    layoutType: data.layout_type ?? undefined,
-    elements: data.elements ?? [],
-  };
-
-  return NextResponse.json({ project: updated });
+  return NextResponse.json({ project: mapRowToProject(data) });
 }
 
 /**

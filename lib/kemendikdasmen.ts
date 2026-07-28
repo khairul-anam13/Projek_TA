@@ -27,8 +27,11 @@ export interface SekolahSearchResult {
   data: SekolahCandidate[];
 }
 
-/** Mencari sekolah berdasarkan kata kunci nama pada database resmi Kemendikdasmen. */
-export async function searchSekolah(keyword: string, size = 15): Promise<SekolahSearchResult> {
+/** Mencari sekolah berdasarkan kata kunci nama pada database resmi Kemendikdasmen.
+ * `kabupatenKota` opsional dipakai untuk mempersempit hasil saat user memilih
+ * satu kandidat spesifik dari daftar saran (dua sekolah berbeda kadang punya
+ * nama yang persis sama di kabupaten berbeda). */
+export async function searchSekolah(keyword: string, size = 15, kabupatenKota = ""): Promise<SekolahSearchResult> {
   const res = await fetch(`${SEKOLAH_API_BASE}/sekolah/cari-sekolah`, {
     method: "POST",
     headers: {
@@ -39,7 +42,7 @@ export async function searchSekolah(keyword: string, size = 15): Promise<Sekolah
       page: 0,
       size,
       keyword,
-      kabupaten_kota: "",
+      kabupaten_kota: kabupatenKota,
       bentuk_pendidikan: "",
       status_sekolah: "",
     }),
@@ -71,30 +74,68 @@ function distinctiveKeyword(input: string): string {
     .trim();
 }
 
+/** Menghasilkan varian "leave-one-out": query dengan tepat satu kata dibuang,
+ * bergiliran untuk tiap kata. Dipakai sebagai upaya terakhir ketika pencarian
+ * frasa penuh maupun kata kunci "distinctive" sama-sama nihil — kemungkinan
+ * besar karena typo ada di salah satu kata, dan API resmi Kemendikdasmen
+ * tidak melakukan fuzzy matching sendiri (hanya cocok persis/substring), jadi
+ * satu kata yang salah eja bisa membuat SELURUH pencarian gagal walau
+ * kata-kata lainnya benar. */
+function leaveOneOutVariants(keyword: string): string[] {
+  const tokens = keyword.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length < 2) return [];
+  return tokens
+    .map((_, i) => tokens.filter((_, j) => j !== i).join(" "))
+    .filter((variant) => variant.length > 0);
+}
+
 /**
- * Pencarian sekolah yang lebih tangguh terhadap keterbatasan API resmi: query multi-kata
- * seperti "SD NEGERI 1 CIBODAS" sering kalah bersaing dengan token generik ("SD NEGERI 1")
- * sehingga sekolah yang benar tidak muncul di hasil. Di sini kita gabungkan hasil pencarian
- * dari frasa asli dengan hasil pencarian kata-kata unik saja (mis. "CIBODAS"), lalu
- * digabung & dihilangkan duplikatnya. Semua kandidat tetap data asli dari Kemendikdasmen.
+ * Pencarian sekolah yang lebih tangguh terhadap keterbatasan API resmi & typo pengguna:
+ * 1. Coba frasa asli apa adanya.
+ * 2. Kalau kalah bersaing dengan token generik ("SD NEGERI 1 CIBODAS" -> "SD NEGERI 1"),
+ *    coba lagi dengan kata-kata unik saja (mis. "CIBODAS").
+ * 3. Kalau KEDUANYA nihil (kemungkinan typo di salah satu kata), coba lagi dengan
+ *    satu kata dibuang bergiliran — kata-kata yang benar tetap bisa menemukan sekolahnya
+ *    walau satu kata lain salah eja.
+ * Semua hasil digabung & dihilangkan duplikatnya. Semua kandidat tetap data asli dari
+ * Kemendikdasmen — pemilihan/penilaian kemiripan akhir dilakukan di lib/fuzzyMatch.ts,
+ * bukan di sini.
  */
-export async function searchSekolahSmart(keyword: string, size = 25): Promise<SekolahSearchResult> {
-  const primary = await searchSekolah(keyword, size);
-
-  const distinctive = distinctiveKeyword(keyword);
-  if (!distinctive || distinctive === keyword.trim().toUpperCase()) {
-    return primary;
-  }
-
-  const secondary = await searchSekolah(distinctive, size);
+export async function searchSekolahSmart(
+  keyword: string,
+  size = 25,
+  kabupatenKota = ""
+): Promise<SekolahSearchResult> {
+  const primary = await searchSekolah(keyword, size, kabupatenKota);
 
   const merged = new Map<string, SekolahCandidate>();
-  for (const c of [...secondary.data, ...primary.data]) {
-    merged.set(c.sekolah_id, c);
+  for (const c of primary.data) merged.set(c.sekolah_id, c);
+  let bestTotal = primary.total;
+
+  const distinctive = distinctiveKeyword(keyword);
+  if (distinctive && distinctive !== keyword.trim().toUpperCase()) {
+    const secondary = await searchSekolah(distinctive, size, kabupatenKota);
+    for (const c of secondary.data) merged.set(c.sekolah_id, c);
+    bestTotal = Math.max(bestTotal, secondary.total);
+  }
+
+  if (merged.size === 0) {
+    const variants = leaveOneOutVariants(keyword.trim().toUpperCase());
+    const attempts = await Promise.all(
+      variants.map((variant) =>
+        searchSekolah(variant, size, kabupatenKota).catch(
+          () => ({ total: 0, data: [] as SekolahCandidate[] })
+        )
+      )
+    );
+    for (const attempt of attempts) {
+      for (const c of attempt.data) merged.set(c.sekolah_id, c);
+      bestTotal = Math.max(bestTotal, attempt.total);
+    }
   }
 
   return {
-    total: Math.max(primary.total, secondary.total),
+    total: bestTotal,
     data: Array.from(merged.values()).slice(0, size),
   };
 }

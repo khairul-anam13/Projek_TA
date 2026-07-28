@@ -27,6 +27,15 @@ create table if not exists public.design_projects (
 
   -- Tampilan kanvas
   background_color text       not null default '#1E3A8A',
+  material_color  text        null,
+
+  -- Spesifikasi cetak & jenis mockup
+  print_size      text        null,
+  print_method    text        null,
+  mockup_type     text        null,
+
+  -- Data JSONB opsional: isian form asal (nama sekolah, alamat, dst.)
+  dynamic_data    jsonb       null,
 
   -- Data JSONB: array elemen kanvas (teks, bentuk, logo)
   elements        jsonb       not null default '[]'::jsonb,

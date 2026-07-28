@@ -1,11 +1,21 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { DesignProject } from "../lib/types";
 import { Download, FileText, RotateCcw } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { Button, PageHeader } from "@/components/ui";
 import jsPDF from "jspdf";
+import { drawTextInBox, scaledInitialFontSize } from "../lib/textLayout";
+import {
+  materialTextureSvgString,
+  MATERIAL_TEXTURE_OPACITY,
+  MATERIAL_TEXTURE_BLEND_MODE,
+  MATERIAL_TEXTURE_BASE_FREQUENCY,
+  MATERIAL_TEXTURE_NUM_OCTAVES,
+  MATERIAL_TEXTURE_COLOR_MATRIX_VALUES,
+} from "../lib/materialTexture";
+import CanvasFitText from "./CanvasFitText";
 
 interface PreviewPageProps {
   project: DesignProject;
@@ -13,7 +23,15 @@ interface PreviewPageProps {
 }
 
 /** Render satu elemen SVG dari data CanvasElement */
-function SvgElement({ el }: { el: DesignProject["elements"][number] }) {
+function SvgElement({
+  el,
+  canvasWidthPx,
+  canvasHeightPx,
+}: {
+  el: DesignProject["elements"][number];
+  canvasWidthPx: number;
+  canvasHeightPx: number;
+}) {
   const ex = `${el.x}%`;
   const ey = `${el.y}%`;
   const ew = `${el.width}%`;
@@ -71,24 +89,18 @@ function SvgElement({ el }: { el: DesignProject["elements"][number] }) {
     );
   }
 
-  if (el.type === "text" && el.text) {
+  if (el.type === "text") {
+    if (!el.text || el.text.trim() === "") return null;
     return (
-      <svg x={ex} y={ey} width={ew} height={eh} viewBox={`0 0 ${el.width * 10} ${el.height * 10}`} preserveAspectRatio="xMidYMid meet" overflow="visible">
-        <text
-          x={el.align === "center" ? "50%" : el.align === "right" ? "100%" : "0%"}
-          y="50%"
-          dominantBaseline="middle"
-          textAnchor={el.align === "center" ? "middle" : el.align === "right" ? "end" : "start"}
-          fill={el.color || "#0F172A"}
-          fontSize={el.fontSize ? el.fontSize * 1.5 : 14}
-          fontFamily={el.fontFamily || "Inter"}
-          fontWeight={el.fontWeight || "normal"}
-        >
-          {el.text}
-        </text>
-      </svg>
+      <CanvasFitText
+        el={el}
+        boxWidthPx={(el.width / 100) * canvasWidthPx}
+        boxHeightPx={(el.height / 100) * canvasHeightPx}
+        canvasWidthPx={canvasWidthPx}
+      />
     );
   }
+
 
   if (el.type === "custom_svg" && el.customSvg) {
     return (
@@ -144,18 +156,21 @@ function DesignCanvas({ project, width, height, borderRadius = 8, isExport = fal
         }}
       />
       
-      {/* Tekstur Bahan SVG Overlay */}
-      <svg className="absolute inset-0 pointer-events-none w-full h-full opacity-60 mix-blend-multiply" style={{ zIndex: 11 }}>
+      {/* Tekstur Bahan SVG Overlay (parameter sinkron dengan lib/materialTexture.ts, dipakai juga oleh pipeline ekspor) */}
+      <svg
+        className="absolute inset-0 pointer-events-none w-full h-full"
+        style={{ zIndex: 11, opacity: MATERIAL_TEXTURE_OPACITY, mixBlendMode: MATERIAL_TEXTURE_BLEND_MODE }}
+      >
         <filter id="leather-texture-preview">
-          <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" result="noise" />
-          <feColorMatrix type="matrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   0 0 0 0.3 0" />
+          <feTurbulence type="fractalNoise" baseFrequency={MATERIAL_TEXTURE_BASE_FREQUENCY} numOctaves={MATERIAL_TEXTURE_NUM_OCTAVES} result="noise" />
+          <feColorMatrix type="matrix" values={MATERIAL_TEXTURE_COLOR_MATRIX_VALUES} />
         </filter>
         <rect width="100%" height="100%" filter="url(#leather-texture-preview)" />
       </svg>
 
       <svg className="absolute inset-0 w-full h-full" aria-hidden="true" style={{zIndex: 20}}>
         {sorted.map((el) => (
-          <SvgElement key={el.id} el={el} />
+          <SvgElement key={el.id} el={el} canvasWidthPx={width} canvasHeightPx={height} />
         ))}
         {!isExport && (
           <image
@@ -318,6 +333,25 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
     ctx.fillStyle = project.materialColor || project.backgroundColor || "#ffffff";
     ctx.fillRect(0, 0, canvasW, canvasH);
 
+    // Lapisan tekstur bahan — sebelumnya TIDAK pernah digambar di sini sama
+    // sekali, sehingga hasil ekspor selalu terlihat polos (hanya elemen teks/
+    // bentuk di atas warna solid) dibanding tampilan bertekstur di editor &
+    // preview. Dirender dari SVG filter yang sama persis (lib/materialTexture.ts)
+    // supaya hasilnya identik, bukan tekstur "mirip-mirip" yang diimplementasi ulang.
+    await new Promise<void>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.save();
+        ctx.globalAlpha = MATERIAL_TEXTURE_OPACITY;
+        ctx.globalCompositeOperation = MATERIAL_TEXTURE_BLEND_MODE;
+        ctx.drawImage(img, 0, 0, canvasW, canvasH);
+        ctx.restore();
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(materialTextureSvgString(canvasW, canvasH))}`;
+    });
+
     const sorted = [...project.elements].sort((a, b) => a.zIndex - b.zIndex);
 
     for (const el of sorted) {
@@ -344,13 +378,17 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
           ctx.fillRect(drawX, drawY, drawW, drawH);
         }
       } else if (el.type === "text" && el.text) {
-        const sz = (el.fontSize || 14) * 1.5 * scaleFactor;
-        ctx.font = `${el.fontWeight || "normal"} ${sz}px ${el.fontFamily || "sans-serif"}`;
-        ctx.fillStyle = el.color || "#000";
-        ctx.textAlign = el.align || "left";
-        ctx.textBaseline = "top";
-        const tx = el.align === "center" ? drawX + drawW / 2 : el.align === "right" ? drawX + drawW : drawX;
-        ctx.fillText(el.text, tx, drawY);
+        const sz = scaledInitialFontSize(el.fontSize, canvasW);
+        drawTextInBox(
+          ctx,
+          el.text,
+          { x: drawX, y: drawY, width: drawW, height: drawH },
+          sz,
+          el.fontFamily || "Times New Roman",
+          el.fontWeight || "normal",
+          el.align || "left",
+          el.color || "#000"
+        );
       } else if (el.type === "image" && el.imageUrl) {
         await new Promise<void>((resolve) => {
           const img = new Image();

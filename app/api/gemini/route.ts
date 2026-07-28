@@ -1,5 +1,6 @@
 import Groq from "groq-sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { sanitizeLayoutElements } from "@/lib/canvasConstraints";
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -74,15 +75,17 @@ Your tasks:
 3. Generate an array of layout elements in "layout_elements" that best positions this information on the page. Use the "Alamat Sekolah" exactly as given above, and use the FIRST option from your "sub_information_options" for the sub information text.
 
 RULES & CONSTRAINTS for layout_elements:
-1. The title (Judul Rapor) should be near the top (Y: 10-25). Font size must be 43.
-2. The school name (Nama Sekolah) should be highly prominent and centered (Y: 35-45). Font size must be 33.
-3. The logo should be placed symmetrically, typically between Title and School Name (Y: 25-33). Logo icon should be "shield" (for Garuda) or "building" (for Kemenag). Type must be "logo".
-4. Alamat and Sub Informasi should be near the bottom (Y: 82-90). Font size must be 23 for Alamat and 13 for Sub Informasi. Give the sub informasi element the exact id "el_sub_info".
-5. CRITICAL CONSTRAINT: DO NOT place any text elements where Y is between 50 and 80. This area is strictly reserved for the physical name window (Mika).
-6. Use font families: "Times New Roman" or "Arial" ONLY.
-7. Default color: "#D4AF37" (Emas) for all elements since this is prepared for Embos Foil printing.
-8. Align must be "center" for most formal documents.
-9. Every field in each layout element is required by the schema — for fields that don't apply (e.g. "text" on a "logo" element, or "logoIcon" on a "text" element), use an empty string "" or 0 instead of omitting them.
+Each element gets its own non-overlapping vertical slot, top to bottom. Y + height must never exceed the NEXT element's Y (leave a small gap), and every element must stay within its slot's Y range — do not let height push an element past its slot boundary into the next one:
+1. Title (Judul Rapor): slot Y 5-16 (i.e. Y between 5 and 16, height <= 10). Font size must be 43.
+2. Logo: slot Y 17-29 (height <= 11), horizontally centered, symmetrically between Title and School Name. Logo icon should be "shield" (for Garuda) or "building" (for Kemenag). Type must be "logo".
+3. School name (Nama Sekolah): slot Y 30-40 (height <= 9), highly prominent and centered. Font size must be 33.
+4. Alamat: slot Y 41-49 (height <= 7). Font size must be 23.
+5. Sub Informasi: slot Y 82-93 (height <= 9). Font size must be 13. Give this element the exact id "el_sub_info".
+6. CRITICAL CONSTRAINT: DO NOT place any text elements where Y is between 50 and 80. This area is strictly reserved for the physical name window (Mika) — this is why slots 1-4 are all above it and slot 5 is below it.
+7. Use font families: "Times New Roman" or "Arial" ONLY.
+8. Default color: "#D4AF37" (Emas) for all elements since this is prepared for Embos Foil printing.
+9. Align must be "center" for most formal documents.
+10. Every field in each layout element is required by the schema — for fields that don't apply (e.g. "text" on a "logo" element, or "logoIcon" on a "text" element), use an empty string "" or 0 instead of omitting them.
 
 Provide a short "description" (in Indonesian) explaining why this layout and hierarchy works best for ${mockupType}.
 `;
@@ -105,6 +108,10 @@ Provide a short "description" (in Indonesian) explaining why this layout and hie
 
     const resultText = response.choices[0]?.message?.content?.trim() || "{}";
     const parsedResult = JSON.parse(resultText);
+
+    if (Array.isArray(parsedResult.layout_elements)) {
+      parsedResult.layout_elements = sanitizeLayoutElements(parsedResult.layout_elements);
+    }
 
     return NextResponse.json({ success: true, result: parsedResult });
   } catch (error: any) {

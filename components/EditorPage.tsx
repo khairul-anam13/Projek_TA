@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { CanvasElement, DesignProject } from "../lib/types";
+import CanvasFitText from "./CanvasFitText";
 import {
   clampToCanvas,
   getCenteredX,
@@ -9,7 +10,16 @@ import {
   enforceMikaConstraint,
   getCardRatio,
   computeImageImportSize,
+  computeResize,
+  ResizeHandle,
 } from "../lib/canvasConstraints";
+import {
+  MATERIAL_TEXTURE_OPACITY,
+  MATERIAL_TEXTURE_BLEND_MODE,
+  MATERIAL_TEXTURE_BASE_FREQUENCY,
+  MATERIAL_TEXTURE_NUM_OCTAVES,
+  MATERIAL_TEXTURE_COLOR_MATRIX_VALUES,
+} from "../lib/materialTexture";
 import {
   Undo,
   Redo,
@@ -37,6 +47,8 @@ import {
   Download,
   Lock,
   Unlock,
+  Loader2,
+  PanelRight,
 } from "lucide-react";
 import ImageToVectorConverter from "./ImageToVectorConverter";
 import { Button, IconButton, Card } from "@/components/ui";
@@ -45,9 +57,20 @@ import { cn } from "@/lib/utils";
 interface EditorPageProps {
   project: DesignProject;
   onBackToDashboard: () => void;
-  onSaveProject: (updatedProject: DesignProject) => void;
-  onExport: (project: DesignProject) => void;
+  onSaveProject: (updatedProject: DesignProject) => Promise<{ project: DesignProject; persisted: boolean }>;
+  onExport: (project: DesignProject) => Promise<void>;
 }
+
+const RESIZE_CURSORS: Record<ResizeHandle, string> = {
+  n: "ns-resize",
+  s: "ns-resize",
+  e: "ew-resize",
+  w: "ew-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  nw: "nwse-resize",
+  se: "nwse-resize",
+};
 
 const PRESET_FONTS = [
   { name: "Times New Roman", label: "Times New Roman (Serif Utama)" },
@@ -101,6 +124,13 @@ export default function EditorPage({
   const [historyIndex, setHistoryIndex] = useState(0);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [activeGuides, setActiveGuides] = useState<{ type: "v" | "h"; value: number }[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  // Promise dari save yang sedang berjalan (kalau ada) — dipakai supaya
+  // "Kembali ke Dashboard" menunggu save selesai dulu alih-alih pindah
+  // halaman sebelum perubahan benar-benar tersimpan (race condition).
+  const pendingSaveRef = useRef<Promise<unknown> | null>(null);
+  const [showPropertiesPanel, setShowPropertiesPanel] = useState(false);
 
   // Docker panel tabs
   const [activeDocker, setActiveDocker] = useState<"properties" | "elements">("properties");
@@ -108,8 +138,18 @@ export default function EditorPage({
 
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, elX: 0, elY: 0 });
+  const isResizingRef = useRef(false);
+  const resizeStartRef = useRef({ x: 0, y: 0, elX: 0, elY: 0, elWidth: 0, elHeight: 0, handle: "se" as ResizeHandle });
   const canvasRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Ref "cermin" berisi elements terbaru, dibaca oleh event listener window
+  // (mousemove/mouseup) yang tidak boleh sering re-subscribe setiap elemen
+  // berubah (akan terjadi berkali-kali per detik saat drag/resize berlangsung).
+  const elementsRef = useRef<CanvasElement[]>(project.elements);
+  useEffect(() => {
+    elementsRef.current = project.elements;
+  }, [project.elements]);
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -158,6 +198,17 @@ export default function EditorPage({
       return { ...p, elements: next };
     });
   }, [pushHistory]);
+
+  // Untuk field angka yang diketik bebas (X, Y, Lebar, Tinggi, Ukuran Font):
+  // update tampilan secara live per keystroke TANPA menulis ke riwayat
+  // undo/redo. Riwayat baru dicatat sekali saat field kehilangan fokus
+  // (lihat commitHistory di onBlur) — supaya Ctrl+Z membatalkan satu
+  // pengeditan penuh, bukan mundur satu digit/karakter setiap kali.
+  const updateNumericField = useCallback((id: string, key: "x" | "y" | "width" | "height" | "fontSize", raw: string) => {
+    const parsed = parseFloat(raw);
+    if (Number.isNaN(parsed)) return;
+    updateElement(id, { [key]: parsed } as Partial<CanvasElement>);
+  }, [updateElement]);
 
   const addElement = useCallback((type: "text" | "shape" | "logo" | "custom_svg" | "image", props: Partial<CanvasElement>) => {
     const id = generateId("el");
@@ -273,19 +324,67 @@ export default function EditorPage({
     dragStartRef.current = { x: e.clientX, y: e.clientY, elX: el.x, elY: el.y };
   };
 
+  const handleResizeMouseDown = (e: React.MouseEvent, id: string, handle: ResizeHandle) => {
+    e.stopPropagation();
+    const el = project.elements.find((x) => x.id === id);
+    if (!el) return;
+    setSelectedId(id);
+    isResizingRef.current = true;
+    resizeStartRef.current = { x: e.clientX, y: e.clientY, elX: el.x, elY: el.y, elWidth: el.width, elHeight: el.height, handle };
+  };
+
+  // Commit snapshot elements saat ini ke riwayat undo/redo. Dipakai saat
+  // sebuah interaksi "selesai" (mouseup setelah drag/resize, atau blur pada
+  // input teks/angka) — supaya satu interaksi = satu langkah undo, bukan satu
+  // langkah per event (per pixel drag, atau per keystroke saat mengetik).
+  const commitHistory = useCallback(() => {
+    setProject((p) => { pushHistory(p.elements); return p; });
+  }, [pushHistory]);
+
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      if (!isDraggingRef.current || !selectedId || !canvasRef.current) return;
+      if (!canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
-      if (!rect.width) return;
+      if (!rect.width || !rect.height) return;
 
-      const dx = ((e.clientX - dragStartRef.current.x) / rect.width) * 100 / zoom;
-      const dy = ((e.clientY - dragStartRef.current.y) / rect.height) * 100 / zoom;
+      if (isResizingRef.current && selectedId) {
+        const dx = ((e.clientX - resizeStartRef.current.x) / rect.width) * 100;
+        const dy = ((e.clientY - resizeStartRef.current.y) / rect.height) * 100;
+        const el = elementsRef.current.find((x) => x.id === selectedId);
+
+        const geometry = computeResize(
+          {
+            x: resizeStartRef.current.elX,
+            y: resizeStartRef.current.elY,
+            width: resizeStartRef.current.elWidth,
+            height: resizeStartRef.current.elHeight,
+          },
+          resizeStartRef.current.handle,
+          dx,
+          dy,
+          !!el?.isLockedX
+        );
+
+        setProject((p) => ({
+          ...p,
+          elements: p.elements.map((x) => (x.id === selectedId ? { ...x, ...geometry } : x)),
+        }));
+        return;
+      }
+
+      if (!isDraggingRef.current || !selectedId) return;
+
+      // Pergerakan mouse dalam persentase kanvas: rect.width sudah mencakup
+      // efek zoom (canvas dirender pada 400*zoom px), jadi TIDAK perlu dibagi
+      // zoom lagi di sini — dulu dibagi dua kali sehingga drag terasa lamban
+      // saat zoom-in dan terlalu sensitif saat zoom-out.
+      const dx = ((e.clientX - dragStartRef.current.x) / rect.width) * 100;
+      const dy = ((e.clientY - dragStartRef.current.y) / rect.height) * 100;
 
       let tx = clampToCanvas(dragStartRef.current.elX + dx);
       let ty = clampToCanvas(dragStartRef.current.elY + dy);
 
-      const elTypeObj = project.elements.find((e) => e.id === selectedId);
+      const elTypeObj = elementsRef.current.find((e) => e.id === selectedId);
       if (elTypeObj?.isLockedX) {
         tx = getCenteredX(elTypeObj.width);
       }
@@ -309,10 +408,11 @@ export default function EditorPage({
     };
 
     const onUp = () => {
-      if (isDraggingRef.current) {
+      if (isDraggingRef.current || isResizingRef.current) {
         isDraggingRef.current = false;
+        isResizingRef.current = false;
         setActiveGuides([]);
-        setProject((p) => { pushHistory(p.elements); return p; });
+        commitHistory();
       }
     };
 
@@ -322,7 +422,7 @@ export default function EditorPage({
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [selectedId, zoom, pushHistory]);
+  }, [selectedId, commitHistory]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -379,8 +479,16 @@ export default function EditorPage({
       )}
 
       {/* ─── TOP BAR ──────────────────────────────────────────────────── */}
-      <header className="h-14 bg-white border-b border-stone-200 flex items-center px-3 gap-1.5 shrink-0 z-30">
-        <IconButton onClick={onBackToDashboard} title="Kembali ke Dashboard">
+      <header className="h-14 bg-white border-b border-stone-200 flex items-center px-3 gap-1.5 shrink-0 z-30 overflow-x-auto overflow-y-hidden">
+        <IconButton
+          onClick={async () => {
+            // Kalau ada save yang masih berjalan, tunggu dulu supaya tidak
+            // pindah halaman sebelum perubahan terakhir benar-benar tersimpan.
+            if (pendingSaveRef.current) await pendingSaveRef.current;
+            onBackToDashboard();
+          }}
+          title="Kembali ke Dashboard"
+        >
           <ChevronLeft size={18} />
         </IconButton>
 
@@ -426,11 +534,56 @@ export default function EditorPage({
 
         <div className="flex-1" />
 
-        <Button variant="secondary" size="sm" onClick={() => { onSaveProject(project); toast("Project Saved"); }} title="Simpan Proyek (Ctrl+S)">
-          <Save size={14} /> Save
+        <IconButton
+          onClick={() => setShowPropertiesPanel((v) => !v)}
+          variant={showPropertiesPanel ? "active" : "default"}
+          title="Panel Properti"
+          className="lg:hidden"
+        >
+          <PanelRight size={16} />
+        </IconButton>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={isSaving}
+          onClick={() => {
+            const savePromise = (async () => {
+              setIsSaving(true);
+              try {
+                const { persisted } = await onSaveProject(project);
+                toast(persisted ? "Proyek tersimpan" : "Tersimpan lokal — server tidak merespons");
+              } catch {
+                toast("Gagal menyimpan proyek. Coba lagi.");
+              } finally {
+                setIsSaving(false);
+              }
+            })();
+            pendingSaveRef.current = savePromise;
+            savePromise.finally(() => {
+              if (pendingSaveRef.current === savePromise) pendingSaveRef.current = null;
+            });
+          }}
+          title="Simpan Proyek (Ctrl+S)"
+        >
+          {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
         </Button>
-        <Button variant="primary" size="sm" onClick={() => onExport(project)} title="Ekspor ke PDF atau Print">
-          <Download size={14} /> Export / Print
+        <Button
+          variant="primary"
+          size="sm"
+          disabled={isExporting}
+          onClick={async () => {
+            setIsExporting(true);
+            try {
+              await onExport(project);
+            } catch {
+              toast("Gagal mengekspor proyek. Coba lagi.");
+              setIsExporting(false);
+            }
+          }}
+          title="Ekspor ke PDF atau Print"
+        >
+          {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Export / Print
         </Button>
       </header>
 
@@ -461,7 +614,7 @@ export default function EditorPage({
 
         {/* ─── CANVAS ─────────────────────────────────────────────────── */}
         <section
-          className="flex-grow bg-stone-100 overflow-auto flex items-center justify-center p-10 relative"
+          className="flex-grow min-w-0 bg-stone-100 overflow-auto flex items-center justify-center p-10 relative"
           onClick={() => setSelectedId(null)}
           onDrop={handleFileDrop}
           onDragOver={handleDragOver}
@@ -477,11 +630,14 @@ export default function EditorPage({
             }}
             ref={canvasRef}
           >
-            {/* Tekstur Bahan SVG Overlay */}
-            <svg className="absolute inset-0 pointer-events-none w-full h-full opacity-60 mix-blend-multiply rounded-lg" style={{ zIndex: 1 }}>
+            {/* Tekstur Bahan SVG Overlay (parameter sinkron dengan lib/materialTexture.ts, dipakai juga oleh pipeline ekspor) */}
+            <svg
+              className="absolute inset-0 pointer-events-none w-full h-full rounded-lg"
+              style={{ zIndex: 1, opacity: MATERIAL_TEXTURE_OPACITY, mixBlendMode: MATERIAL_TEXTURE_BLEND_MODE }}
+            >
               <filter id="leather-texture">
-                <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" result="noise" />
-                <feColorMatrix type="matrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   0 0 0 0.3 0" />
+                <feTurbulence type="fractalNoise" baseFrequency={MATERIAL_TEXTURE_BASE_FREQUENCY} numOctaves={MATERIAL_TEXTURE_NUM_OCTAVES} result="noise" />
+                <feColorMatrix type="matrix" values={MATERIAL_TEXTURE_COLOR_MATRIX_VALUES} />
               </filter>
               <rect width="100%" height="100%" filter="url(#leather-texture)" />
             </svg>
@@ -522,19 +678,12 @@ export default function EditorPage({
                       </svg>
                     )}
                     {el.type === "text" && el.text && (
-                      <svg x={ex} y={ey} width={ew} height={eh} viewBox={`0 0 ${el.width * 10} ${el.height * 10}`} preserveAspectRatio="xMidYMid meet" overflow="visible">
-                        <text
-                          x={el.align === "center" ? "50%" : el.align === "right" ? "100%" : "0%"}
-                          y="50%" dominantBaseline="middle"
-                          textAnchor={el.align === "center" ? "middle" : el.align === "right" ? "end" : "start"}
-                          fill={el.color || "#000"}
-                          fontSize={el.fontSize ? el.fontSize * 1.5 : 16}
-                          fontFamily={el.fontFamily || "Arial"}
-                          fontWeight={el.fontWeight || "normal"}
-                        >
-                          {el.text}
-                        </text>
-                      </svg>
+                      <CanvasFitText
+                        el={el}
+                        boxWidthPx={(el.width / 100) * canvasW}
+                        boxHeightPx={(el.height / 100) * canvasH}
+                        canvasWidthPx={canvasW}
+                      />
                     )}
                     {el.type === "custom_svg" && el.customSvg && (
                       <g dangerouslySetInnerHTML={{
@@ -562,11 +711,25 @@ export default function EditorPage({
                           width={`${el.width}%`} height={`${el.height}%`}
                           fill="none" stroke="#0d9488" strokeWidth="1.5" strokeDasharray="4 3"
                         />
-                        {/* 8 Anchor points */}
-                        {[[el.x, el.y], [el.x + el.width/2, el.y], [el.x + el.width, el.y],
-                          [el.x, el.y + el.height/2], [el.x + el.width, el.y + el.height/2],
-                          [el.x, el.y + el.height], [el.x + el.width/2, el.y + el.height], [el.x + el.width, el.y + el.height]].map(([cx, cy], i) => (
-                          <rect key={i} x={`${cx}%`} y={`${cy}%`} width="7" height="7" rx="1.5" transform="translate(-3.5, -3.5)" fill="#0d9488" stroke="#fff" strokeWidth="1" />
+                        {/* 8 Anchor points (resize handles) */}
+                        {([
+                          { handle: "nw", cx: el.x, cy: el.y },
+                          { handle: "n", cx: el.x + el.width / 2, cy: el.y },
+                          { handle: "ne", cx: el.x + el.width, cy: el.y },
+                          { handle: "w", cx: el.x, cy: el.y + el.height / 2 },
+                          { handle: "e", cx: el.x + el.width, cy: el.y + el.height / 2 },
+                          { handle: "sw", cx: el.x, cy: el.y + el.height },
+                          { handle: "s", cx: el.x + el.width / 2, cy: el.y + el.height },
+                          { handle: "se", cx: el.x + el.width, cy: el.y + el.height },
+                        ] as { handle: ResizeHandle; cx: number; cy: number }[]).map(({ handle, cx, cy }) => (
+                          <rect
+                            key={handle}
+                            x={`${cx}%`} y={`${cy}%`}
+                            width="7" height="7" rx="1.5" transform="translate(-3.5, -3.5)"
+                            fill="#0d9488" stroke="#fff" strokeWidth="1"
+                            style={{ cursor: RESIZE_CURSORS[handle] }}
+                            onMouseDown={(e) => handleResizeMouseDown(e, el.id, handle)}
+                          />
                         ))}
                       </g>
                     )}
@@ -595,8 +758,23 @@ export default function EditorPage({
           </div>
         </section>
 
+        {/* Backdrop panel properti (hanya tampil di layar sempit saat panel dibuka) */}
+        {showPropertiesPanel && (
+          <div
+            className="fixed inset-0 bg-stone-900/30 z-40 lg:hidden"
+            onClick={() => setShowPropertiesPanel(false)}
+          />
+        )}
+
         {/* ─── RIGHT PANEL ────────────────────────────────────────────── */}
-        <div className="w-80 bg-white border-l border-stone-200 flex flex-col shrink-0">
+        <div
+          className={cn(
+            "w-80 max-w-[85vw] bg-white border-l border-stone-200 flex flex-col shrink-0",
+            "fixed inset-y-0 right-0 z-50 transition-transform duration-200 ease-out",
+            showPropertiesPanel ? "translate-x-0" : "translate-x-full",
+            "lg:static lg:inset-auto lg:translate-x-0 lg:z-auto lg:transition-none"
+          )}
+        >
           {/* TABS */}
           <div className="flex gap-1 p-2 border-b border-stone-200">
             {([
@@ -700,20 +878,20 @@ export default function EditorPage({
                       <div className="grid grid-cols-2 gap-2 mb-2">
                         <div>
                           <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">X</label>
-                          <input type="number" value={selectedEl.x} onChange={(e) => commitUpdate(selectedEl.id, {x: parseFloat(e.target.value)})} className={cn(fieldClass, "w-full")} />
+                          <input type="number" value={selectedEl.x} onChange={(e) => updateNumericField(selectedEl.id, "x", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Y</label>
-                          <input type="number" value={selectedEl.y} onChange={(e) => commitUpdate(selectedEl.id, {y: parseFloat(e.target.value)})} className={cn(fieldClass, "w-full")} />
+                          <input type="number" value={selectedEl.y} onChange={(e) => updateNumericField(selectedEl.id, "y", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Lebar</label>
-                          <input type="number" value={selectedEl.width} onChange={(e) => commitUpdate(selectedEl.id, {width: parseFloat(e.target.value)})} className={cn(fieldClass, "w-full")} />
+                          <input type="number" value={selectedEl.width} onChange={(e) => updateNumericField(selectedEl.id, "width", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                         </div>
                         {selectedEl.type !== 'text' && (
                           <div>
                             <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Tinggi</label>
-                            <input type="number" value={selectedEl.height} onChange={(e) => commitUpdate(selectedEl.id, {height: parseFloat(e.target.value)})} className={cn(fieldClass, "w-full")} />
+                            <input type="number" value={selectedEl.height} onChange={(e) => updateNumericField(selectedEl.id, "height", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                           </div>
                         )}
                       </div>
@@ -764,7 +942,9 @@ export default function EditorPage({
                             type="text"
                             className={cn(fieldClass, "w-full")}
                             value={selectedEl.text || ""}
-                            onChange={(e) => commitUpdate(selectedId!, { text: e.target.value })}
+                            onChange={(e) => updateElement(selectedId!, { text: e.target.value })}
+                            onBlur={commitHistory}
+                            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                             placeholder="Ketik teks..."
                           />
 
@@ -775,7 +955,8 @@ export default function EditorPage({
                               list="font-sizes"
                               className={cn(fieldClass, "w-full")}
                               value={selectedEl.fontSize || 14}
-                              onChange={(e) => commitUpdate(selectedId!, { fontSize: Number(e.target.value) })}
+                              onChange={(e) => updateNumericField(selectedId!, "fontSize", e.target.value)}
+                              onBlur={commitHistory}
                             />
                             <datalist id="font-sizes">
                               <option value="43" label="Judul Besar" />

@@ -37,7 +37,9 @@ export default function Editor() {
       .catch(() => setNotFound(true));
   }, [projectsLoading, projectFromContext, params.id]);
 
-  const saveProject = async (updatedProject: DesignProject): Promise<DesignProject> => {
+  const saveProject = async (
+    updatedProject: DesignProject
+  ): Promise<{ project: DesignProject; persisted: boolean }> => {
     try {
       const res = await fetch(`/api/projects/${updatedProject.id}`, {
         method: "PUT",
@@ -51,7 +53,7 @@ export default function Editor() {
           prev.some((p) => p.id === saved.id) ? prev.map((p) => (p.id === saved.id ? saved : p)) : [saved, ...prev]
         );
         setFetchedProject(saved);
-        return saved;
+        return { project: saved, persisted: true };
       }
     } catch {
       // Fallback ke optimistic update di bawah
@@ -62,7 +64,7 @@ export default function Editor() {
         : [updatedProject, ...prev]
     );
     setFetchedProject(updatedProject);
-    return updatedProject;
+    return { project: updatedProject, persisted: false };
   };
 
   if (isLoading) {
@@ -94,10 +96,11 @@ export default function Editor() {
       project={project}
       onBackToDashboard={() => router.push("/dashboard")}
       onSaveProject={saveProject}
-      onExport={(exportProject) => {
+      onExport={async (exportProject) => {
         // Simpan dulu perubahan terbaru sebelum ke halaman preview, supaya
         // preview tidak menampilkan versi lama yang belum di-save.
-        saveProject(exportProject).then((saved) => router.push(`/preview/${saved.id}`));
+        const { project: saved } = await saveProject(exportProject);
+        router.push(`/preview/${saved.id}`);
       }}
     />
   );

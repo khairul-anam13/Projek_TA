@@ -1,16 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-
-const { mockCreate } = vi.hoisted(() => ({
-  mockCreate: vi.fn(),
-}));
-
-vi.mock("groq-sdk", () => ({
-  default: vi.fn().mockImplementation(function (this: any) {
-    this.chat = { completions: { create: mockCreate } };
-  }),
-}));
-
 import { POST } from "../sekolah/route";
 
 const fetchMock = vi.fn();
@@ -27,6 +16,7 @@ function makeRequest(body: any) {
   });
 }
 
+/** Setiap panggilan fetch (primary/distinctive/leave-one-out) mendapat respons yang sama. */
 function mockSearchResponse(total: number, data: any[]) {
   fetchMock.mockResolvedValue({
     ok: true,
@@ -35,9 +25,13 @@ function mockSearchResponse(total: number, data: any[]) {
   });
 }
 
-function mockMatchResponse(matchedIndex: number) {
-  mockCreate.mockResolvedValue({
-    choices: [{ message: { content: JSON.stringify({ matched_index: matchedIndex }) } }],
+/** Respons berbeda tergantung keyword yang dikirim — untuk mensimulasikan
+ * bagaimana API resmi hanya menemukan hasil untuk keyword yang benar-benar cocok. */
+function mockSearchResponseByKeyword(handler: (keyword: string) => { total: number; data: any[] }) {
+  fetchMock.mockImplementation(async (_url: string, init: any) => {
+    const body = JSON.parse(init.body);
+    const result = handler(body.keyword);
+    return { ok: true, status: 200, json: async () => ({ status_code: 200, message: "success", ...result }) };
   });
 }
 
@@ -71,37 +65,51 @@ const SD_2 = {
   kode_pos: "54321",
 };
 
-describe("POST /api/gemini/sekolah — autofill data sekolah dari sumber resmi", () => {
-  it("namaSekolah kosong -> 400, tidak memanggil sumber data atau Groq", async () => {
+const LAWU_ASIH = {
+  sekolah_id: "id-3",
+  npsn: "11223344",
+  nama: "SD NEGERI LAWU ASIH",
+  bentuk_pendidikan: "SD",
+  status_sekolah: "NEGERI",
+  akreditasi: "B",
+  alamat_jalan: "Jl. Lawu No. 1",
+  nama_dusun: null,
+  kecamatan: "Kec. Lawu",
+  kabupaten: "Kab. Cirebon",
+  provinsi: "Jawa Barat",
+  kode_pos: "45100",
+};
+
+describe("POST /api/gemini/sekolah — autofill data sekolah dari sumber resmi (fuzzy, tanpa LLM)", () => {
+  it("namaSekolah kosong -> 400, tidak memanggil sumber data", async () => {
     const res = await POST(makeRequest({}));
     expect(res.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it("kegagalan menghubungi sumber resmi -> 502, bukan fallback ke Groq", async () => {
+  it("kegagalan menghubungi sumber resmi -> 502", async () => {
     fetchMock.mockRejectedValue(new Error("network down"));
     const res = await POST(makeRequest({ namaSekolah: "SD NEGERI 1 CONTOH" }));
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.success).toBe(false);
-    expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it("sekolah tidak ditemukan (total 0) -> 404 dengan pesan jelas", async () => {
+  it("sekolah benar-benar tidak ditemukan -> 404 dengan pesan jelas untuk memeriksa ejaan, tanpa daftar kandidat", async () => {
     mockSearchResponse(0, []);
     const res = await POST(makeRequest({ namaSekolah: "SEKOLAH TIDAK ADA XYZ" }));
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.success).toBe(false);
     expect(body.error).toMatch(/tidak ditemukan/i);
+    expect(body.error).toMatch(/periksa/i);
+    expect(body.candidates ?? []).toHaveLength(0);
   });
 
-  it("hasil tunggal -> langsung dipakai tanpa memanggil Groq, alamat & sub_informasi dari data asli", async () => {
+  it("hasil tunggal & identik dengan input -> langsung dipakai (auto-select), alamat & sub_informasi dari data asli", async () => {
     mockSearchResponse(1, [SD_1]);
     const res = await POST(makeRequest({ namaSekolah: "SD NEGERI 1 CONTOH" }));
     expect(res.status).toBe(200);
-    expect(mockCreate).not.toHaveBeenCalled();
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.result.alamat).toBe(
@@ -111,31 +119,71 @@ describe("POST /api/gemini/sekolah — autofill data sekolah dari sumber resmi",
     expect(body.result.sub_informasi).toContain("Akreditasi: A");
   });
 
-  it("banyak kandidat -> Groq memilih indeks yang cocok, data yang dikembalikan tetap data asli", async () => {
+  it("input dengan typo 1-2 karakter tetap menemukan & auto-select sekolah yang dimaksud (bug utama yang diperbaiki)", async () => {
+    mockSearchResponseByKeyword((kw) =>
+      kw === "SD NEGERI LAWU" ? { total: 1, data: [LAWU_ASIH] } : { total: 0, data: [] }
+    );
+    // "ASIG" adalah typo untuk "ASIH"
+    const res = await POST(makeRequest({ namaSekolah: "SD NEGERI LAWU ASIG" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.result.nama_sekolah).toBe("SD NEGERI LAWU ASIH");
+    expect(body.result.npsn).toBe("11223344");
+  });
+
+  it("beda singkatan (SDN vs SD Negeri) tetap auto-select lewat fuzzy matching, tanpa exact match", async () => {
+    mockSearchResponse(1, [LAWU_ASIH]);
+    const res = await POST(makeRequest({ namaSekolah: "SDN Lawu Asih" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.result.nama_sekolah).toBe("SD NEGERI LAWU ASIH");
+  });
+
+  it("satu kandidat tapi kemiripannya rendah -> TIDAK auto-select, dikembalikan sebagai pilihan (bukan ditebak)", async () => {
+    mockSearchResponse(1, [SD_2]); // "SD NEGERI 1 LAIN" jauh berbeda dari query di bawah
+    const res = await POST(makeRequest({ namaSekolah: "SMA TARUNA NUSANTARA" }));
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.needsChoice).toBe(true);
+    expect(body.candidates).toHaveLength(1);
+  });
+
+  it("banyak kandidat, salah satu jelas paling mirip -> auto-select kandidat itu, bukan LLM yang memilih", async () => {
     mockSearchResponse(2, [SD_1, SD_2]);
-    mockMatchResponse(1);
     const res = await POST(makeRequest({ namaSekolah: "SD NEGERI 1 LAIN" }));
     expect(res.status).toBe(200);
-    expect(mockCreate).toHaveBeenCalledTimes(1);
     const body = await res.json();
     expect(body.result.npsn).toBe("87654321");
     expect(body.result.alamat).toContain("Jl. Lain No. 2");
   });
 
-  it("Groq tidak yakin (matched_index -1) -> 404 dengan daftar saran kandidat, bukan data karangan", async () => {
-    mockSearchResponse(2, [SD_1, SD_2]);
-    mockMatchResponse(-1);
-    const res = await POST(makeRequest({ namaSekolah: "SEKOLAH AMBIGU" }));
+  it("banyak kandidat dengan skor kemiripan sama-sama tinggi (ambigu) -> 404 dengan daftar pilihan berskor, bukan data karangan", async () => {
+    const TWIN_A = { ...SD_1, sekolah_id: "twin-a", nama: "SD NEGERI 1 MERDEKA" };
+    const TWIN_B = { ...SD_2, sekolah_id: "twin-b", nama: "SD NEGERI 1 MERDEKA" };
+    mockSearchResponse(2, [TWIN_A, TWIN_B]);
+    const res = await POST(makeRequest({ namaSekolah: "SD NEGERI 1 MERDEKA" }));
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.success).toBe(false);
+    expect(body.needsChoice).toBe(true);
     expect(body.candidates).toHaveLength(2);
+    expect(body.candidates[0]).toHaveProperty("score");
   });
 
-  it("Groq mengembalikan indeks di luar jangkauan -> diperlakukan sebagai tidak ada kecocokan (404)", async () => {
-    mockSearchResponse(2, [SD_1, SD_2]);
-    mockMatchResponse(99);
-    const res = await POST(makeRequest({ namaSekolah: "SEKOLAH AMBIGU" }));
+  it("kandidat yang sama sekali tidak mirip tidak diikutsertakan sebagai top pilihan yang auto-select", async () => {
+    mockSearchResponse(1, [SD_1]);
+    const res = await POST(makeRequest({ namaSekolah: "UNIVERSITAS GADJAH MADA" }));
     expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.needsChoice).toBe(true);
+  });
+
+  it("field kabupaten opsional diteruskan sebagai filter pencarian", async () => {
+    mockSearchResponse(1, [LAWU_ASIH]);
+    await POST(makeRequest({ namaSekolah: "SD NEGERI LAWU ASIH", kabupaten: "Kab. Cirebon" }));
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body).kabupaten_kota).toBe("Kab. Cirebon");
   });
 });

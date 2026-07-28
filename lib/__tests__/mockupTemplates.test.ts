@@ -60,4 +60,32 @@ describe("getMockupTemplate (AI Auto-Layout fallback template, Equivalence Parti
     );
     expect(textInMikaZone).toEqual([]);
   });
+
+  it("tidak ada dua elemen yang saling bertumpang tindih (overlap) secara visual", () => {
+    const elements = getMockupTemplate("Rapor SD", data);
+    const overlaps = (
+      a: { x: number; y: number; width: number; height: number },
+      b: { x: number; y: number; width: number; height: number }
+    ) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+
+    const collisions: string[] = [];
+    for (let i = 0; i < elements.length; i++) {
+      for (let j = i + 1; j < elements.length; j++) {
+        if (overlaps(elements[i], elements[j])) {
+          collisions.push(`${elements[i].id} x ${elements[j].id}`);
+        }
+      }
+    }
+    expect(collisions).toEqual([]);
+  });
+
+  it("semua elemen tetap berada dalam batas kanvas 0-100", () => {
+    const elements = getMockupTemplate("Rapor SD", data);
+    for (const el of elements) {
+      expect(el.x).toBeGreaterThanOrEqual(0);
+      expect(el.y).toBeGreaterThanOrEqual(0);
+      expect(el.x + el.width).toBeLessThanOrEqual(100);
+      expect(el.y + el.height).toBeLessThanOrEqual(100);
+    }
+  });
 });

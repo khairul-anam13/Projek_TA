@@ -1,19 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
-import { Sparkles, ChevronRight, PenTool, Search, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Sparkles, ChevronRight, PenTool, Search, Loader2, CheckCircle2, AlertCircle, ListFilter } from "lucide-react";
 import { MockupType, ProductType } from "../lib/types";
 import { Button, Input, Textarea, PageHeader } from "@/components/ui";
+
+const SEARCH_DEBOUNCE_MS = 400;
+const MIN_QUERY_LENGTH_FOR_AUTO_SEARCH = 3;
 
 interface SekolahSuggestion {
   nama: string;
   npsn?: string;
   kabupaten: string | null;
   provinsi: string | null;
+  /** Skor kemiripan 0-1 terhadap ketikan user (lib/fuzzyMatch.ts). */
+  score?: number;
 }
 
 interface SchoolLookupState {
-  status: "idle" | "loading" | "success" | "error";
+  status: "idle" | "loading" | "success" | "error" | "choices";
   message: string;
   suggestions: SekolahSuggestion[];
 }
@@ -35,8 +40,8 @@ interface CreateProjectPageProps {
    * kosong) tetap sama seperti sebelumnya. */
   initialFormData?: CreateProjectFormData;
   onBack: () => void;
-  onSkipAi: (formData: any) => void;
-  onGenerateAi: (formData: any) => void;
+  onSkipAi: (formData: any) => void | Promise<void>;
+  onGenerateAi: (formData: any) => void | Promise<void>;
 }
 
 const MOCKUPS: MockupType[] = ["Rapor SD", "Rapor SMP", "Rapor SMA/SMK", "Rapor MAN"];
@@ -67,40 +72,57 @@ export default function CreateProjectPage({
     suggestions: [],
   });
 
-  const handleSearchSekolah = async (nameOverride?: string) => {
-    const query = (nameOverride ?? namaSekolah).trim();
+  // Token pencarian terbaru — dipakai supaya respons dari request yang sudah
+  // "basi" (ada request lebih baru yang menyusul, mis. saat debounce menembak
+  // beberapa kali berturut-turut) tidak menimpa hasil pencarian yang lebih baru.
+  const searchTokenRef = useRef(0);
+
+  const runSearch = useCallback(async (rawQuery: string, kabupaten?: string) => {
+    const query = rawQuery.trim();
     if (!query) {
-      setSchoolLookup({ status: "error", message: "Ketik nama sekolah dahulu sebelum mencari.", suggestions: [] });
+      setSchoolLookup({ status: "idle", message: "", suggestions: [] });
       return;
     }
-    if (nameOverride) setNamaSekolah(nameOverride);
 
+    const token = ++searchTokenRef.current;
     setSchoolLookup({ status: "loading", message: "", suggestions: [] });
+
     try {
       const res = await fetch("/api/gemini/sekolah", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ namaSekolah: query }),
+        body: JSON.stringify({ namaSekolah: query, kabupaten }),
       });
       const data = await res.json();
+      if (token !== searchTokenRef.current) return; // ada pencarian lebih baru; abaikan hasil ini
 
-      if (!res.ok || !data.success) {
+      if (data.success) {
+        setAlamatSekolah(data.result.alamat);
+        setSubInformasi(data.result.sub_informasi);
         setSchoolLookup({
-          status: "error",
-          message: data.error || "Sekolah tidak ditemukan.",
-          suggestions: data.candidates || [],
+          status: "success",
+          message: `Ditemukan: ${data.result.nama_sekolah} (NPSN ${data.result.npsn}). Data dari sumber resmi Kemendikdasmen — silakan periksa & edit bila perlu.`,
+          suggestions: [],
         });
         return;
       }
 
-      setAlamatSekolah(data.result.alamat);
-      setSubInformasi(data.result.sub_informasi);
+      if (data.needsChoice && Array.isArray(data.candidates) && data.candidates.length > 0) {
+        setSchoolLookup({
+          status: "choices",
+          message: data.error || "Ditemukan beberapa sekolah yang mirip — pilih salah satu:",
+          suggestions: data.candidates,
+        });
+        return;
+      }
+
       setSchoolLookup({
-        status: "success",
-        message: `Ditemukan: ${data.result.nama_sekolah} (NPSN ${data.result.npsn}). Data dari sumber resmi Kemendikdasmen — silakan periksa & edit bila perlu.`,
+        status: "error",
+        message: data.error || "Sekolah tidak ditemukan.",
         suggestions: [],
       });
     } catch (err) {
+      if (token !== searchTokenRef.current) return;
       console.error(err);
       setSchoolLookup({
         status: "error",
@@ -108,7 +130,30 @@ export default function CreateProjectPage({
         suggestions: [],
       });
     }
-  };
+  }, []);
+
+  const handlePickCandidate = useCallback((s: SekolahSuggestion) => {
+    setNamaSekolah(s.nama);
+    runSearch(s.nama, s.kabupaten ?? undefined);
+  }, [runSearch]);
+
+  // Auto-search dengan debounce (mirip autocomplete search engine): menembak
+  // sendiri beberapa saat setelah user berhenti mengetik, supaya tidak perlu
+  // selalu menekan tombol cari. Dilewati pada render pertama supaya nama
+  // sekolah yang sudah terisi (mis. kembali dari halaman hasil AI) tidak
+  // langsung memicu request sebelum user benar-benar mengetik sesuatu.
+  const hasMountedRef = useRef(false);
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    const trimmed = namaSekolah.trim();
+    if (trimmed.length < MIN_QUERY_LENGTH_FOR_AUTO_SEARCH) return;
+
+    const timer = setTimeout(() => runSearch(trimmed), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [namaSekolah, runSearch]);
 
   // Rotating tips shown during the AI generation process
   const loadingTips = [
@@ -138,12 +183,18 @@ export default function CreateProjectPage({
     }
   };
 
-  const handleSkipAi = () => {
+  const handleSkipAi = async () => {
     if (isSubmitting) return;
     if (!handleValidation()) return;
     setIsSubmitting(true);
     setIsUsingAi(false);
-    onSkipAi(formData);
+    try {
+      await onSkipAi(formData);
+    } catch (err) {
+      console.error(err);
+      setError("Gagal membuat proyek. Coba lagi.");
+      setIsSubmitting(false);
+    }
   };
 
   const handleSubmitAi = async (e: React.FormEvent) => {
@@ -275,7 +326,7 @@ export default function CreateProjectPage({
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
-                          handleSearchSekolah();
+                          runSearch(namaSekolah);
                         }
                       }}
                       placeholder="Contoh: SMA NEGERI 1 JAKARTA"
@@ -287,7 +338,7 @@ export default function CreateProjectPage({
                       size="md"
                       className="shrink-0 px-3"
                       disabled={schoolLookup.status === "loading" || !namaSekolah.trim()}
-                      onClick={() => handleSearchSekolah()}
+                      onClick={() => runSearch(namaSekolah)}
                       title="Cari data sekolah dari Kemendikdasmen"
                     >
                       {schoolLookup.status === "loading" ? (
@@ -310,27 +361,44 @@ export default function CreateProjectPage({
                       <span>{schoolLookup.message}</span>
                     </p>
                   )}
+                  {schoolLookup.status === "choices" && (
+                    <div className="mt-1.5 border border-stone-200 rounded-xl overflow-hidden shadow-sm">
+                      <p className="px-3 py-2 bg-stone-50 border-b border-stone-200 flex items-center gap-1.5 text-xs font-semibold text-stone-600">
+                        <ListFilter className="w-3.5 h-3.5 shrink-0" />
+                        {schoolLookup.message}
+                      </p>
+                      <ul className="max-h-56 overflow-y-auto divide-y divide-stone-100">
+                        {schoolLookup.suggestions.map((s, i) => (
+                          <li key={i}>
+                            <button
+                              type="button"
+                              onClick={() => handlePickCandidate(s)}
+                              className="w-full text-left px-3 py-2.5 hover:bg-brand-50 transition flex items-center justify-between gap-2 cursor-pointer"
+                            >
+                              <span className="min-w-0">
+                                <span className="block text-sm font-semibold text-stone-800 truncate">{s.nama}</span>
+                                <span className="block text-xs text-stone-400 truncate">
+                                  {[s.kabupaten, s.provinsi].filter(Boolean).join(", ") || "Lokasi tidak diketahui"}
+                                  {s.npsn ? ` · NPSN ${s.npsn}` : ""}
+                                </span>
+                              </span>
+                              {typeof s.score === "number" && (
+                                <span className="shrink-0 text-[10px] font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full">
+                                  {Math.round(s.score * 100)}%
+                                </span>
+                              )}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {schoolLookup.status === "error" && (
                     <div className="mt-1.5 text-xs text-rose-600">
                       <p className="flex items-start gap-1.5">
                         <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                         <span>{schoolLookup.message}</span>
                       </p>
-                      {schoolLookup.suggestions.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1.5 pl-5">
-                          {schoolLookup.suggestions.map((s, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => handleSearchSekolah(s.nama)}
-                              className="px-2 py-1 rounded-full border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition"
-                            >
-                              {s.nama}
-                              {s.kabupaten ? `, ${s.kabupaten}` : ""}
-                            </button>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -373,8 +441,12 @@ export default function CreateProjectPage({
                 onClick={handleSkipAi}
                 disabled={isSubmitting}
               >
-                <PenTool className="w-4 h-4" />
-                Lewati AI (Template Standar)
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <PenTool className="w-4 h-4" />
+                )}
+                {isSubmitting ? "Memproses..." : "Lewati AI (Template Standar)"}
               </Button>
 
               <Button type="submit" variant="primary" size="lg" disabled={isSubmitting}>

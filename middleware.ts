@@ -50,7 +50,7 @@ export async function middleware(request: NextRequest) {
   // atau jauhkan dari /login & / jika sudah login. /api/gemini* sengaja
   // tidak disentuh sama sekali oleh blok ini.
   if (!isApiRoute) {
-    const isPublicPage = pathname === "/login" || pathname.startsWith("/auth");
+    const isPublicPage = pathname === "/login" || pathname.startsWith("/auth") || pathname.startsWith("/_qa");
 
     if (!user && !isPublicPage) {
       const redirectUrl = request.nextUrl.clone();

@@ -1,4 +1,3 @@
-import Groq from "groq-sdk";
 import { NextRequest, NextResponse } from "next/server";
 import {
   buildAlamat,
@@ -6,79 +5,21 @@ import {
   searchSekolahSmart,
   SekolahCandidate,
 } from "@/lib/kemendikdasmen";
+import { rankCandidates, shouldAutoSelect, ScoredCandidate } from "@/lib/fuzzyMatch";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
-const MATCH_SCHEMA = {
-  type: "object",
-  properties: {
-    matched_index: {
-      type: "number",
-      description: "Indeks kandidat paling cocok (0-based), atau -1 jika tidak ada yang cocok",
-    },
-  },
-  required: ["matched_index"],
-  additionalProperties: false,
-} as const;
-
-function candidateSuggestions(candidates: SekolahCandidate[], limit = 5) {
-  return candidates.slice(0, limit).map((c) => ({
+function candidateSuggestions(ranked: ScoredCandidate<SekolahCandidate>[]) {
+  return ranked.map(({ candidate: c, score }) => ({
     nama: c.nama,
     npsn: c.npsn,
     kabupaten: c.kabupaten,
     provinsi: c.provinsi,
+    score: Math.round(score * 100) / 100,
   }));
-}
-
-/** Meminta LLM (Groq) memilih kandidat MANA (indeks) yang paling cocok dengan ketikan user.
- * Model hanya memilih dari daftar data asli yang sudah diambil dari Kemendikdasmen —
- * tidak diminta dan tidak diizinkan untuk mengarang data sekolah baru. */
-async function pickBestMatch(
-  namaSekolahInput: string,
-  candidates: SekolahCandidate[]
-): Promise<number> {
-  const prompt = `Seorang pengguna mengetik nama sekolah: "${namaSekolahInput}"
-
-Berikut daftar kandidat sekolah nyata dari database resmi Kemendikdasmen (indeks dimulai dari 0):
-${candidates
-  .map(
-    (c, i) =>
-      `${i}. ${c.nama} | NPSN: ${c.npsn} | ${c.bentuk_pendidikan ?? "-"} | ${c.status_sekolah ?? "-"} | Kec. ${c.kecamatan ?? "-"}, ${c.kabupaten ?? "-"}, ${c.provinsi ?? "-"}`
-  )
-  .join("\n")}
-
-Tugas: pilih indeks kandidat yang PALING sesuai dengan yang dimaksud user. Pertimbangkan kemiripan nama, jenjang, dan lokasi jika disebutkan.
-JANGAN mengarang sekolah baru. Jika tidak ada kandidat yang cukup meyakinkan cocok, kembalikan matched_index: -1.`;
-
-  const response = await groq.chat.completions.create({
-    model: "openai/gpt-oss-20b",
-    max_completion_tokens: 1024,
-    reasoning_effort: "low",
-    messages: [
-      {
-        role: "system",
-        content:
-          "Anda adalah asisten pencocokan data yang HANYA memilih dari daftar yang diberikan, tidak pernah mengarang data baru.",
-      },
-      { role: "user", content: prompt },
-    ],
-    response_format: {
-      type: "json_schema",
-      json_schema: { name: "match_result", strict: true, schema: MATCH_SCHEMA },
-    },
-  });
-
-  const parsed = JSON.parse(
-    response.choices[0]?.message?.content?.trim() || '{"matched_index": -1}'
-  );
-  return Number(parsed.matched_index);
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { namaSekolah } = await req.json();
+    const { namaSekolah, kabupaten } = await req.json();
 
     if (!namaSekolah || !String(namaSekolah).trim()) {
       return NextResponse.json(
@@ -87,9 +28,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const query = String(namaSekolah).trim();
+
     let searchResult;
     try {
-      searchResult = await searchSekolahSmart(String(namaSekolah).trim());
+      searchResult = await searchSekolahSmart(query, 25, kabupaten ? String(kabupaten) : "");
     } catch (fetchError) {
       console.error("Kemendikdasmen search failed:", fetchError);
       return NextResponse.json(
@@ -105,34 +48,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `Sekolah "${namaSekolah}" tidak ditemukan di database resmi Kemendikdasmen. Periksa kembali ejaan nama sekolah, atau isi data secara manual.`,
+          error: `Sekolah "${query}" tidak ditemukan di database resmi Kemendikdasmen. Coba periksa kembali penulisan nama sekolah, atau isi data secara manual.`,
         },
         { status: 404 }
       );
     }
 
-    let matched: SekolahCandidate;
+    // Typo-tolerant fuzzy ranking (Levenshtein similarity, lib/fuzzyMatch.ts) —
+    // BUKAN exact match dan BUKAN LLM: skor kemiripan dihitung secara
+    // deterministik terhadap data asli yang sudah ditemukan di atas, supaya
+    // hasilnya konsisten & tidak berisiko "mengarang" pilihan seperti model
+    // bahasa. Kandidat teratas hanya dipakai otomatis kalau sangat meyakinkan
+    // (lihat shouldAutoSelect) — kalau ambigu, user yang memilih.
+    const ranked = rankCandidates(query, searchResult.data, (c) => c.nama);
 
-    if (searchResult.data.length === 1) {
-      matched = searchResult.data[0];
-    } else {
-      const matchedIndex = await pickBestMatch(namaSekolah, searchResult.data);
-      if (
-        !Number.isInteger(matchedIndex) ||
-        matchedIndex < 0 ||
-        matchedIndex >= searchResult.data.length
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Tidak ditemukan sekolah yang cocok persis dengan "${namaSekolah}". Berikut beberapa sekolah mirip yang ditemukan:`,
-            candidates: candidateSuggestions(searchResult.data),
-          },
-          { status: 404 }
-        );
-      }
-      matched = searchResult.data[matchedIndex];
+    if (!shouldAutoSelect(ranked)) {
+      return NextResponse.json(
+        {
+          success: false,
+          needsChoice: true,
+          error: `Ditemukan ${ranked.length > 1 ? "beberapa sekolah yang mirip" : "satu sekolah yang mirip, namun belum pasti"} dengan "${query}". Pilih salah satu:`,
+          candidates: candidateSuggestions(ranked),
+        },
+        { status: 404 }
+      );
     }
+
+    const matched = ranked[0].candidate;
 
     return NextResponse.json({
       success: true,
