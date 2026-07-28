@@ -12,7 +12,7 @@ Industri percetakan konvensional masih mengandalkan perangkat lunak berat sepert
 
 Web-to-Print Editor hadir sebagai solusi berbasis web yang menggabungkan tiga pilar utama:
 
-1. **Otomatisasi berbasis AI** — Tata letak elemen desain dihasilkan secara otomatis menggunakan Google Gemini.
+1. **Otomatisasi berbasis AI** — Tata letak elemen desain dihasilkan secara otomatis menggunakan Groq API (gratis).
 2. **Editor vektor interaktif** — Antarmuka berbasis kanvas yang bekerja langsung di browser tanpa instalasi.
 3. **Pratinjau produk fisik** — Visualisasi 3D yang mensimulasikan tampilan nyata sebelum naik cetak.
 
@@ -49,7 +49,7 @@ Desain yang telah dibuat dapat divisualisasikan dalam bentuk mockup tiga dimensi
 |---|---|
 | Framework | Next.js (App Router), React.js |
 | Styling | Tailwind CSS, Vanilla CSS |
-| Kecerdasan Buatan | Google Gemini 3.5 Flash API |
+| Kecerdasan Buatan | Groq API — openai/gpt-oss-20b |
 | Database | Supabase (PostgreSQL) |
 | Autentikasi | Supabase Auth (Row Level Security) |
 | Penyimpanan Aset | Supabase Storage |
@@ -81,7 +81,7 @@ Salin file `.env.example` menjadi `.env.local` dan isi dengan kredensial berikut
 ```env
 NEXT_PUBLIC_SUPABASE_URL="https://[YOUR_PROJECT_ID].supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
-GEMINI_API_KEY="your-gemini-api-key"
+GROQ_API_KEY="your-groq-api-key"
 ```
 
 **3. Inisialisasi database**

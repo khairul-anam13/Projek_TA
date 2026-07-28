@@ -1,14 +1,51 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import Groq from "groq-sdk";
 import { NextRequest, NextResponse } from "next/server";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
+
+const LAYOUT_SCHEMA = {
+  type: "object",
+  properties: {
+    description: { type: "string", description: "Detailed concept explanation in Indonesian" },
+    sub_information_options: {
+      type: "array",
+      description: "Array of exactly 3 different string options for Sub Informasi",
+      items: { type: "string" },
+    },
+    layout_elements: {
+      type: "array",
+      description: "Array of canvas elements",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Unique ID, e.g. el_title, el_sub_info" },
+          type: { type: "string", description: "Either 'text' or 'logo'" },
+          text: { type: "string", description: "The text content (empty string if type is 'logo')" },
+          logoIcon: { type: "string", description: "The icon name (empty string if type is 'text'), e.g. 'shield' or 'building'" },
+          x: { type: "number", description: "X coordinate (0-100)" },
+          y: { type: "number", description: "Y coordinate (0-100)" },
+          width: { type: "number", description: "Width percentage (10-100)" },
+          height: { type: "number", description: "Height percentage (5-20)" },
+          fontSize: { type: "number", description: "Font size for text (0 if type is 'logo')" },
+          fontWeight: { type: "string", description: "'normal' or 'bold'" },
+          align: { type: "string", description: "'left', 'center', or 'right'" },
+          fontFamily: { type: "string", description: "'Times New Roman' or 'Arial'" },
+          color: { type: "string", description: "Always '#D4AF37'" },
+          zIndex: { type: "number", description: "Stacking order" },
+        },
+        required: [
+          "id", "type", "text", "logoIcon", "x", "y", "width", "height",
+          "fontSize", "fontWeight", "align", "fontFamily", "color", "zIndex",
+        ],
+        additionalProperties: false,
+      },
     },
   },
-});
+  required: ["description", "sub_information_options", "layout_elements"],
+  additionalProperties: false,
+} as const;
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,19 +61,17 @@ export async function POST(req: NextRequest) {
     const { judulRapor, namaSekolah, alamatSekolah, subInformasi } = dynamicData;
 
     const prompt = `You are an expert brand designer and AI layout assistant for physical printing templates.
-You also have general knowledge about schools in Indonesia.
 Generate a personalized visual design layout for a ${mockupType} printing mockup.
-Here is the data provided by the user:
+Here is the data provided by the user — treat it as authoritative and do NOT invent, "correct", or replace it with information from your own general knowledge:
 - Judul Rapor: ${judulRapor}
 - Nama Sekolah: ${namaSekolah}
-- Alamat Sekolah (User Input): ${alamatSekolah}
-- Sub Informasi (User Input): ${subInformasi}
+- Alamat Sekolah: ${alamatSekolah}
+- Sub Informasi: ${subInformasi}
 
 Your tasks:
-1. Identify the school based on "Nama Sekolah". Verify its real address in the real world. If the real address is different from the user's input, provide the real address in "corrected_address". If it's the same or you are unsure, return an empty string.
-2. Based on the school and formal report (rapor) standards, recommend 3 options for "Sub Informasi & Keterangan Tambahan" (e.g., NPSN, Akreditasi, Tahun Pelajaran, etc.) in "sub_information_options".
-3. The printing size is roughly an A4/F4 aspect ratio. The coordinate system uses 0-100 for X and Y axes (0,0 is top left, 100,100 is bottom right).
-4. Generate an array of layout elements in "layout_elements" that best positions this information on the page. Use the corrected address if you found one, and use the FIRST option from your "sub_information_options" for the sub information text.
+1. Based on formal report (rapor) standards, recommend 3 options for "Sub Informasi & Keterangan Tambahan" phrasing/formatting (e.g. how to present NPSN, Akreditasi, Tahun Pelajaran, etc.) in "sub_information_options". Base these ONLY on reformatting/summarizing the "Sub Informasi" text the user provided above — do not add facts (like NPSN numbers or accreditation) that are not present in it.
+2. The printing size is roughly an A4/F4 aspect ratio. The coordinate system uses 0-100 for X and Y axes (0,0 is top left, 100,100 is bottom right).
+3. Generate an array of layout elements in "layout_elements" that best positions this information on the page. Use the "Alamat Sekolah" exactly as given above, and use the FIRST option from your "sub_information_options" for the sub information text.
 
 RULES & CONSTRAINTS for layout_elements:
 1. The title (Judul Rapor) should be near the top (Y: 10-25). Font size must be 43.
@@ -47,62 +82,33 @@ RULES & CONSTRAINTS for layout_elements:
 6. Use font families: "Times New Roman" or "Arial" ONLY.
 7. Default color: "#D4AF37" (Emas) for all elements since this is prepared for Embos Foil printing.
 8. Align must be "center" for most formal documents.
+9. Every field in each layout element is required by the schema — for fields that don't apply (e.g. "text" on a "logo" element, or "logoIcon" on a "text" element), use an empty string "" or 0 instead of omitting them.
 
 Provide a short "description" (in Indonesian) explaining why this layout and hierarchy works best for ${mockupType}.
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: prompt,
-      config: {
-        systemInstruction: "You are an elite graphic designer AI and data verifier specialized in generating precise coordinate-based JSON layouts and verifying school data.",
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            description: { type: Type.STRING, description: "Detailed concept explanation in Indonesian" },
-            corrected_address: { type: Type.STRING, description: "Corrected real-world address if different, else empty string" },
-            sub_information_options: {
-              type: Type.ARRAY,
-              description: "Array of exactly 3 different string options for Sub Informasi",
-              items: { type: Type.STRING }
-            },
-            layout_elements: {
-              type: Type.ARRAY,
-              description: "Array of canvas elements",
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.STRING, description: "Unique ID, e.g. el_title, el_sub_info" },
-                  type: { type: Type.STRING, description: "Either 'text' or 'logo'" },
-                  text: { type: Type.STRING, description: "The text content (if type is text)" },
-                  logoIcon: { type: Type.STRING, description: "The icon name (if type is logo), e.g. 'shield' or 'building'" },
-                  x: { type: Type.NUMBER, description: "X coordinate (0-100)" },
-                  y: { type: Type.NUMBER, description: "Y coordinate (0-100)" },
-                  width: { type: Type.NUMBER, description: "Width percentage (10-100)" },
-                  height: { type: Type.NUMBER, description: "Height percentage (5-20)" },
-                  fontSize: { type: Type.NUMBER, description: "Font size for text (10-40)" },
-                  fontWeight: { type: Type.STRING, description: "'normal' or 'bold'" },
-                  align: { type: Type.STRING, description: "'left', 'center', or 'right'" },
-                  fontFamily: { type: Type.STRING, description: "'Times New Roman' or 'Arial'" },
-                  color: { type: Type.STRING, description: "Always '#D4AF37'" },
-                  zIndex: { type: Type.NUMBER, description: "Stacking order" },
-                },
-                required: ["id", "type", "x", "y", "width", "height", "color", "zIndex"]
-              }
-            }
-          },
-          required: ["description", "corrected_address", "sub_information_options", "layout_elements"],
+    const response = await groq.chat.completions.create({
+      model: "openai/gpt-oss-20b",
+      max_completion_tokens: 4096,
+      messages: [
+        {
+          role: "system",
+          content: "You are an elite graphic designer AI specialized in generating precise coordinate-based JSON layouts from data the user provides. You never invent or alter factual data such as addresses or school information — you only lay it out.",
         },
+        { role: "user", content: prompt },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "layout_result", strict: true, schema: LAYOUT_SCHEMA },
       },
     });
 
-    const resultText = response.text?.trim() || "{}";
+    const resultText = response.choices[0]?.message?.content?.trim() || "{}";
     const parsedResult = JSON.parse(resultText);
 
     return NextResponse.json({ success: true, result: parsedResult });
   } catch (error: any) {
-    console.error("Gemini AI API generation failed:", error);
+    console.error("Groq AI API generation failed:", error);
     return NextResponse.json(
       {
         success: false,

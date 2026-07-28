@@ -38,12 +38,35 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { pathname } = request.nextUrl;
+  const isApiRoute = pathname.startsWith("/api");
+
   // Lindungi API routes proyek — kembalikan 401 jika tidak ada sesi
-  if (
-    !user &&
-    request.nextUrl.pathname.startsWith("/api/projects")
-  ) {
+  if (!user && pathname.startsWith("/api/projects")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Lindungi halaman (non-API) — redirect ke /login jika belum ada sesi,
+  // atau jauhkan dari /login & / jika sudah login. /api/gemini* sengaja
+  // tidak disentuh sama sekali oleh blok ini.
+  if (!isApiRoute) {
+    const isPublicPage = pathname === "/login" || pathname.startsWith("/auth");
+
+    if (!user && !isPublicPage) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      const redirectResponse = NextResponse.redirect(redirectUrl);
+      supabaseResponse.cookies.getAll().forEach((c) => redirectResponse.cookies.set(c));
+      return redirectResponse;
+    }
+
+    if (user && (pathname === "/login" || pathname === "/")) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/dashboard";
+      const redirectResponse = NextResponse.redirect(redirectUrl);
+      supabaseResponse.cookies.getAll().forEach((c) => redirectResponse.cookies.set(c));
+      return redirectResponse;
+    }
   }
 
   return supabaseResponse;

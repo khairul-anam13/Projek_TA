@@ -3,6 +3,61 @@ import { NextRequest, NextResponse } from "next/server";
 import { DesignProject } from "@/lib/types";
 
 /**
+ * GET /api/projects/[id]
+ * Mengambil satu proyek berdasarkan id. RLS/ownership check memastikan
+ * hanya pemilik proyek yang bisa mengaksesnya — id milik user lain atau
+ * yang tidak ada akan mengembalikan 404.
+ */
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  const { data, error } = await supabase
+    .from("design_projects")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (error || !data) {
+    return NextResponse.json({ error: "Proyek tidak ditemukan." }, { status: 404 });
+  }
+
+  const project: DesignProject = {
+    id: data.id,
+    name: data.name,
+    productType: data.product_type,
+    category: data.category,
+    concept: data.concept,
+    audience: data.audience,
+    backgroundColor: data.background_color,
+    slogan: data.slogan,
+    description: data.description,
+    createdAt: data.created_at,
+    status: data.status,
+    palette: data.palette ?? undefined,
+    typography: data.typography ?? undefined,
+    layoutType: data.layout_type ?? undefined,
+    elements: data.elements ?? [],
+  };
+
+  return NextResponse.json({ project });
+}
+
+/**
  * PUT /api/projects/[id]
  * Memperbarui proyek yang sudah ada. RLS Supabase memastikan hanya
  * pemilik proyek yang bisa memperbarui datanya.

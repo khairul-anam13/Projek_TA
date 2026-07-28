@@ -1,11 +1,39 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, ArrowLeft, BookOpen, ChevronRight, PenTool } from "lucide-react";
+import { Sparkles, ChevronRight, PenTool, Search, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { MockupType, ProductType } from "../lib/types";
+import { Button, Input, Textarea, PageHeader } from "@/components/ui";
+
+interface SekolahSuggestion {
+  nama: string;
+  npsn?: string;
+  kabupaten: string | null;
+  provinsi: string | null;
+}
+
+interface SchoolLookupState {
+  status: "idle" | "loading" | "success" | "error";
+  message: string;
+  suggestions: SekolahSuggestion[];
+}
+
+interface CreateProjectFormData {
+  mockupType: MockupType;
+  dynamicData: {
+    judulRapor: string;
+    namaSekolah: string;
+    alamatSekolah: string;
+    subInformasi: string;
+  };
+}
 
 interface CreateProjectPageProps {
   initialProductType: ProductType;
+  /** Isian awal opsional — dipakai saat pengguna kembali dari halaman hasil AI
+   * agar form tidak kosong. Kalau tidak diberikan, perilaku default (form
+   * kosong) tetap sama seperti sebelumnya. */
+  initialFormData?: CreateProjectFormData;
   onBack: () => void;
   onSkipAi: (formData: any) => void;
   onGenerateAi: (formData: any) => void;
@@ -15,22 +43,72 @@ const MOCKUPS: MockupType[] = ["Rapor SD", "Rapor SMP", "Rapor SMA/SMK", "Rapor 
 
 export default function CreateProjectPage({
   initialProductType,
+  initialFormData,
   onBack,
   onSkipAi,
   onGenerateAi,
 }: CreateProjectPageProps) {
-  const [mockupType, setMockupType] = useState<MockupType>("Rapor SD");
-  
+  const [mockupType, setMockupType] = useState<MockupType>(initialFormData?.mockupType ?? "Rapor SD");
+
   // Dynamic fields
-  const [judulRapor, setJudulRapor] = useState("RAPOR PESERTA DIDIK");
-  const [namaSekolah, setNamaSekolah] = useState("");
-  const [alamatSekolah, setAlamatSekolah] = useState("");
-  const [subInformasi, setSubInformasi] = useState("");
+  const [judulRapor, setJudulRapor] = useState(initialFormData?.dynamicData.judulRapor ?? "RAPOR PESERTA DIDIK");
+  const [namaSekolah, setNamaSekolah] = useState(initialFormData?.dynamicData.namaSekolah ?? "");
+  const [alamatSekolah, setAlamatSekolah] = useState(initialFormData?.dynamicData.alamatSekolah ?? "");
+  const [subInformasi, setSubInformasi] = useState(initialFormData?.dynamicData.subInformasi ?? "");
 
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const [isUsingAi, setIsUsingAi] = useState(true);
+
+  const [schoolLookup, setSchoolLookup] = useState<SchoolLookupState>({
+    status: "idle",
+    message: "",
+    suggestions: [],
+  });
+
+  const handleSearchSekolah = async (nameOverride?: string) => {
+    const query = (nameOverride ?? namaSekolah).trim();
+    if (!query) {
+      setSchoolLookup({ status: "error", message: "Ketik nama sekolah dahulu sebelum mencari.", suggestions: [] });
+      return;
+    }
+    if (nameOverride) setNamaSekolah(nameOverride);
+
+    setSchoolLookup({ status: "loading", message: "", suggestions: [] });
+    try {
+      const res = await fetch("/api/gemini/sekolah", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ namaSekolah: query }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setSchoolLookup({
+          status: "error",
+          message: data.error || "Sekolah tidak ditemukan.",
+          suggestions: data.candidates || [],
+        });
+        return;
+      }
+
+      setAlamatSekolah(data.result.alamat);
+      setSubInformasi(data.result.sub_informasi);
+      setSchoolLookup({
+        status: "success",
+        message: `Ditemukan: ${data.result.nama_sekolah} (NPSN ${data.result.npsn}). Data dari sumber resmi Kemendikdasmen — silakan periksa & edit bila perlu.`,
+        suggestions: [],
+      });
+    } catch (err) {
+      console.error(err);
+      setSchoolLookup({
+        status: "error",
+        message: "Gagal terhubung ke server pencarian sekolah. Coba lagi.",
+        suggestions: [],
+      });
+    }
+  };
 
   // Rotating tips shown during the AI generation process
   const loadingTips = [
@@ -97,28 +175,28 @@ export default function CreateProjectPage({
 
   if (isSubmitting && isUsingAi) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white" id="ai-loading-screen">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(59,130,246,0.25),transparent_50%)]" />
-        <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:24px_24px]" />
-        
+      <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-white" id="ai-loading-screen">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(20,184,166,0.25),transparent_50%)]" />
+        <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#292524_1px,transparent_1px),linear-gradient(to_bottom,#292524_1px,transparent_1px)] bg-[size:24px_24px]" />
+
         <div className="relative z-10 flex flex-col items-center text-center max-w-lg w-full">
-          <div className="w-20 h-20 bg-slate-800/80 rounded-2xl flex items-center justify-center mb-8 shadow-2xl border border-slate-700/50 backdrop-blur-sm relative">
-            <div className="absolute inset-0 rounded-2xl border-2 border-teal-500/30 animate-ping" />
-            <Sparkles className="w-10 h-10 text-teal-400 animate-pulse" />
+          <div className="w-20 h-20 bg-stone-800/80 rounded-2xl flex items-center justify-center mb-8 shadow-2xl border border-stone-700/50 backdrop-blur-sm relative">
+            <div className="absolute inset-0 rounded-2xl border-2 border-brand-500/30 animate-ping" />
+            <Sparkles className="w-10 h-10 text-brand-400 animate-pulse" />
           </div>
 
-          <h2 className="text-2xl font-bold mb-3 tracking-tight text-slate-100">AI Mengenerate Tata Letak</h2>
-          
-          <div className="w-full bg-slate-800/50 rounded-full h-2 mb-6 border border-slate-700/50 overflow-hidden">
-            <div 
-              className="bg-gradient-to-r from-teal-500 via-blue-500 to-teal-400 h-2 rounded-full transition-all duration-1000 ease-out relative"
+          <h2 className="text-2xl font-bold mb-3 tracking-tight text-stone-100 font-display-space">AI Mengenerate Tata Letak</h2>
+
+          <div className="w-full bg-stone-800/50 rounded-full h-2 mb-6 border border-stone-700/50 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-brand-500 via-teal-400 to-brand-400 h-2 rounded-full transition-all duration-1000 ease-out relative"
               style={{ width: `${Math.max(15, (loadingStep / loadingTips.length) * 100)}%` }}
             >
               <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_1s_infinite]" />
             </div>
           </div>
 
-          <p className="text-sm text-slate-400 font-medium h-6 animate-pulse">
+          <p className="text-sm text-stone-400 font-medium h-6 animate-pulse">
             {loadingTips[loadingStep] || loadingTips[loadingTips.length - 1]}
           </p>
         </div>
@@ -127,29 +205,13 @@ export default function CreateProjectPage({
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col" id="create-project-page">
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-6 h-16 flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="p-2 -ml-2 rounded-full hover:bg-stone-100 text-stone-500 transition-colors"
-            title="Kembali"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg overflow-hidden shadow-sm">
-              <img src="/pagefree.png" alt="Page Free Logo" className="w-full h-full object-cover bg-white" />
-            </div>
-            <h1 className="text-lg font-bold text-stone-800">PageFree</h1>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-canvas flex flex-col" id="create-project-page">
+      <PageHeader onBack={onBack} title="PageFree" />
 
       <main className="flex-grow p-6 py-10" id="create-form-container">
-        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+        <div className="max-w-3xl mx-auto bg-surface rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
           <div className="p-8 border-b border-stone-100 bg-gradient-to-br from-stone-50 to-white">
-            <h2 className="text-xl font-bold text-stone-800 mb-2">Pilih Jenis Mockup & Informasi</h2>
+            <h2 className="text-xl font-bold text-stone-800 mb-2 font-display-space">Pilih Jenis Mockup & Informasi</h2>
             <p className="text-sm text-stone-500">
               Data ini akan digunakan untuk menyusun tata letak (layout) dan tipografi sampul secara otomatis.
             </p>
@@ -157,8 +219,8 @@ export default function CreateProjectPage({
 
           <form onSubmit={handleSubmitAi} className="p-8 space-y-8">
             {error && (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm font-medium">
-                <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+              <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-3 text-rose-600 text-sm font-medium">
+                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
                 {error}
               </div>
             )}
@@ -174,7 +236,7 @@ export default function CreateProjectPage({
                       onClick={() => setMockupType(m)}
                       className={`px-4 py-3 rounded-xl border-2 cursor-pointer transition text-center text-sm font-semibold ${
                         mockupType === m
-                          ? "border-teal-500 bg-teal-50 text-teal-700 shadow-sm"
+                          ? "border-brand-500 bg-brand-50 text-brand-700 shadow-sm"
                           : "border-stone-200 text-stone-500 hover:border-stone-300 hover:bg-stone-50"
                       }`}
                     >
@@ -192,9 +254,8 @@ export default function CreateProjectPage({
                   <label className="block text-sm font-bold text-stone-700 mb-1.5">
                     Judul Rapor
                   </label>
-                  <input
+                  <Input
                     type="text"
-                    className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition shadow-sm text-sm"
                     value={judulRapor}
                     onChange={(e) => setJudulRapor(e.target.value)}
                     placeholder="Contoh: RAPOR PESERTA DIDIK"
@@ -203,16 +264,75 @@ export default function CreateProjectPage({
 
                 <div>
                   <label className="block text-sm font-bold text-stone-700 mb-1.5">
-                    Nama Sekolah <span className="text-red-500">*</span>
+                    Nama Sekolah <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition shadow-sm text-sm font-semibold text-stone-800 placeholder:font-normal"
-                    value={namaSekolah}
-                    onChange={(e) => setNamaSekolah(e.target.value)}
-                    placeholder="Contoh: SMA NEGERI 1 JAKARTA"
-                    autoFocus
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      className="font-semibold text-stone-800 placeholder:font-normal"
+                      value={namaSekolah}
+                      onChange={(e) => setNamaSekolah(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleSearchSekolah();
+                        }
+                      }}
+                      placeholder="Contoh: SMA NEGERI 1 JAKARTA"
+                      autoFocus
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="md"
+                      className="shrink-0 px-3"
+                      disabled={schoolLookup.status === "loading" || !namaSekolah.trim()}
+                      onClick={() => handleSearchSekolah()}
+                      title="Cari data sekolah dari Kemendikdasmen"
+                    >
+                      {schoolLookup.status === "loading" ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Search className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+
+                  {schoolLookup.status === "loading" && (
+                    <p className="mt-1.5 text-xs text-stone-500 flex items-center gap-1.5">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Mencari data sekolah di database resmi Kemendikdasmen...
+                    </p>
+                  )}
+                  {schoolLookup.status === "success" && (
+                    <p className="mt-1.5 text-xs text-brand-700 flex items-start gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span>{schoolLookup.message}</span>
+                    </p>
+                  )}
+                  {schoolLookup.status === "error" && (
+                    <div className="mt-1.5 text-xs text-rose-600">
+                      <p className="flex items-start gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>{schoolLookup.message}</span>
+                      </p>
+                      {schoolLookup.suggestions.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5 pl-5">
+                          {schoolLookup.suggestions.map((s, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => handleSearchSekolah(s.nama)}
+                              className="px-2 py-1 rounded-full border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition"
+                            >
+                              {s.nama}
+                              {s.kabupaten ? `, ${s.kabupaten}` : ""}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -220,45 +340,44 @@ export default function CreateProjectPage({
                 <label className="block text-sm font-bold text-stone-700 mb-1.5">
                   Alamat Sekolah
                 </label>
-                <input
+                <Input
                   type="text"
-                  className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition shadow-sm text-sm"
                   value={alamatSekolah}
                   onChange={(e) => setAlamatSekolah(e.target.value)}
                   placeholder="Contoh: Jl. Pendidikan No. 123, Kota X"
                 />
+                <p className="mt-1 text-xs text-stone-400">
+                  Bisa diisi otomatis lewat tombol cari di atas, atau diedit manual.
+                </p>
               </div>
 
               <div>
                 <label className="block text-sm font-bold text-stone-700 mb-1.5">
                   Sub Informasi & Keterangan Tambahan
                 </label>
-                <textarea
-                  className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition shadow-sm text-sm h-24 resize-none"
+                <Textarea
+                  className="h-24"
                   value={subInformasi}
                   onChange={(e) => setSubInformasi(e.target.value)}
-                  placeholder="Contoh: NPSN: 12345678&#10;Tahun Pelajaran: 2026/2027&#10;Terakreditasi A"
+                  placeholder={"Contoh: NPSN: 12345678\nTahun Pelajaran: 2026/2027\nTerakreditasi A"}
                 />
               </div>
             </div>
 
             {/* Actions Block */}
             <div className="pt-6 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-end gap-3">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="lg"
                 onClick={handleSkipAi}
                 disabled={isSubmitting}
-                className="px-5 py-2.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 font-semibold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <PenTool className="w-4 h-4" />
                 Lewati AI (Template Standar)
-              </button>
+              </Button>
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transform transition active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
-              >
+              <Button type="submit" variant="primary" size="lg" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -269,13 +388,13 @@ export default function CreateProjectPage({
                 )}
                 <span>{isSubmitting ? "Memproses..." : "Gunakan AI untuk Layout"}</span>
                 {!isSubmitting && <ChevronRight className="w-4 h-4" />}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
       </main>
 
-      <footer className="text-center py-6 text-[11px] text-slate-400 font-mono">
+      <footer className="text-center py-6 text-[11px] text-stone-400 font-mono">
         Page Free Generator Platform — 2026 PT Indonesia
       </footer>
     </div>

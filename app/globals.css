@@ -6,5 +6,25 @@
   --font-layout-space: var(--font-display-space), sans-serif;
   --font-layout-outfit: var(--font-display-outfit), sans-serif;
   --font-layout-serif: var(--font-serif), serif;
+
+  /*
+   * Design system tokens — Page Free "modern SaaS" theme.
+   * Single brand accent (teal) + stone neutrals. App chrome only:
+   * user-generated design content keeps its own free color choices.
+   */
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4;
+  --color-brand-300: #5eead4;
+  --color-brand-400: #2dd4bf;
+  --color-brand-500: #14b8a6;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+  --color-brand-800: #115e59;
+  --color-brand-900: #134e4a;
+
+  --color-canvas: #fafaf9;
+  --color-surface: #ffffff;
+  --color-border-subtle: #e7e5e4;
 }
 

@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Upload, X, Wand2, Download, Save, Image as ImageIcon } from "lucide-react";
+import { Upload, X, Wand2, Download, Save } from "lucide-react";
 import { removeBackground, Config } from '@imgly/background-removal';
 import { traceDataUrl, getSVG } from '@cadit-app/potrace-ts';
 import { createClient } from "@/lib/supabase/client";
+import { Button, IconButton } from "@/components/ui";
 
 interface Props {
   onInsertSVG: (svgString: string) => void;
@@ -227,97 +228,91 @@ export default function ImageToVectorConverter({ onInsertSVG, onClose }: Props) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden flex flex-col relative">
-        <button onClick={onClose} className="absolute top-3 right-3 p-1 text-gray-500 hover:text-black bg-gray-100 rounded-full">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col relative">
+        <IconButton onClick={onClose} className="absolute top-3 right-3" title="Tutup">
           <X size={18} />
-        </button>
-        
-        <div className="p-5 border-b border-gray-200">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <Wand2 className="text-teal-600" /> Image to Vector Magic
+        </IconButton>
+
+        <div className="p-5 border-b border-stone-200">
+          <h2 className="text-lg font-bold flex items-center gap-2 text-stone-900">
+            <Wand2 className="text-brand-600" /> Image to Vector Magic
           </h2>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-stone-500 mt-1">
             Remove background and convert raster (JPG/PNG) to pure vector lines in your browser.
           </p>
         </div>
 
         <div className="p-5 flex flex-col items-center">
-          
+
           {/* Hidden Canvas for processing */}
           <canvas ref={canvasRef} className="hidden"></canvas>
 
           {status === "idle" && (
-            <label className="w-full h-48 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-teal-500 transition">
-              <Upload className="w-8 h-8 text-gray-400 mb-2" />
-              <span className="text-sm font-semibold text-gray-600">Click to upload JPG / PNG</span>
-              <span className="text-xs text-gray-400 mt-1">Processed 100% locally</span>
+            <label className="w-full h-48 border-2 border-dashed border-stone-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-stone-50 hover:border-brand-500 transition">
+              <Upload className="w-8 h-8 text-stone-400 mb-2" />
+              <span className="text-sm font-semibold text-stone-600">Click to upload JPG / PNG</span>
+              <span className="text-xs text-stone-400 mt-1">Processed 100% locally</span>
               <input type="file" className="hidden" accept="image/jpeg, image/png, image/webp" onChange={handleFileChange} />
             </label>
           )}
 
           {["loading-model", "removing-bg", "thresholding", "vectorizing"].includes(status) && (
             <div className="w-full h-48 flex flex-col items-center justify-center">
-              <div className="w-12 h-12 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin mb-4"></div>
-              <p className="text-sm font-bold text-gray-700">{getStatusText()}</p>
-              <p className="text-xs text-gray-400 mt-1 max-w-xs text-center">
+              <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4"></div>
+              <p className="text-sm font-bold text-stone-700">{getStatusText()}</p>
+              <p className="text-xs text-stone-400 mt-1 max-w-xs text-center">
                 Please wait, processing image entirely on your device...
               </p>
             </div>
           )}
 
           {status === "error" && (
-            <div className="w-full h-48 flex flex-col items-center justify-center text-red-500 text-center">
+            <div className="w-full h-48 flex flex-col items-center justify-center text-rose-500 text-center">
               <X className="w-10 h-10 mb-2" />
               <p className="text-sm font-bold">{getStatusText()}</p>
-              <button onClick={() => setStatus("idle")} className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200">
+              <Button variant="secondary" size="sm" className="mt-4" onClick={() => setStatus("idle")}>
                 Try Again
-              </button>
+              </Button>
             </div>
           )}
 
           {status === "success" && svgResult && (
             <div className="w-full flex flex-col items-center">
-              <div className="w-48 h-48 border border-gray-200 rounded-lg p-2 bg-gray-50 flex items-center justify-center overflow-hidden checkerboard-bg">
+              <div className="w-48 h-48 border border-stone-200 rounded-lg p-2 bg-stone-50 flex items-center justify-center overflow-hidden checkerboard-bg">
                 {/* Safe render of SVG using dangerouslySetInnerHTML since we generated it via potrace */}
-                <div 
-                  className="w-full h-full [&>svg]:w-full [&>svg]:h-full" 
-                  dangerouslySetInnerHTML={{ __html: svgResult }} 
+                <div
+                  className="w-full h-full [&>svg]:w-full [&>svg]:h-full"
+                  dangerouslySetInnerHTML={{ __html: svgResult }}
                 />
               </div>
 
               <div className="w-full mt-4 flex gap-2">
-                <button 
-                  onClick={downloadSVG} 
-                  className="flex-1 py-2 flex items-center justify-center gap-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50"
-                >
+                <Button variant="secondary" size="sm" className="flex-1" onClick={downloadSVG}>
                   <Download size={14} /> Download SVG
-                </button>
-                <button 
-                  onClick={handleInsert} 
-                  className="flex-1 py-2 flex items-center justify-center gap-2 bg-teal-600 text-white rounded-lg text-xs font-bold hover:bg-teal-700"
-                >
+                </Button>
+                <Button variant="primary" size="sm" className="flex-1" onClick={handleInsert}>
                   <Save size={14} /> Gunakan di Kanvas
-                </button>
+                </Button>
               </div>
             </div>
           )}
         </div>
 
         {status === "success" && (
-          <div className="p-3 bg-gray-50 border-t border-gray-200 flex justify-between items-center text-xs">
-             <span className="text-gray-500 font-medium">B&W Threshold: {threshold}</span>
-             <input 
-               type="range" 
-               min={10} max={240} 
-               value={threshold} 
+          <div className="p-3 bg-stone-50 border-t border-stone-200 flex justify-between items-center text-xs">
+             <span className="text-stone-500 font-medium">B&W Threshold: {threshold}</span>
+             <input
+               type="range"
+               min={10} max={240}
+               value={threshold}
                onChange={(e) => {
                  setThreshold(parseInt(e.target.value));
-               }} 
+               }}
                onMouseUp={() => {
                  if (originalFile) processImage(originalFile);
                }}
-               className="w-32"
+               className="w-32 accent-brand-600"
              />
           </div>
         )}

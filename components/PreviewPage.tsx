@@ -2,8 +2,10 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { DesignProject } from "../lib/types";
-import { ArrowLeft, Download, FileText, ChevronLeft, RotateCcw } from "lucide-react";
+import { Download, FileText, RotateCcw } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
+import { Button, PageHeader } from "@/components/ui";
+import jsPDF from "jspdf";
 
 interface PreviewPageProps {
   project: DesignProject;
@@ -382,13 +384,27 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
       ctx.restore();
     }
 
+    const fileBaseName = `PageFree-${project.name.replace(/\s+/g, "_")}-SampulRapor`;
+
     if (format === "png") {
       const a = document.createElement("a");
-      a.download = `PageFree-${project.name.replace(/\s+/g, "_")}-SampulRapor.png`;
+      a.download = `${fileBaseName}.png`;
       a.href = canvas.toDataURL("image/png");
       a.click();
     } else {
-      window.print();
+      // Ukuran fisik cetak sebenarnya (mm), bukan ukuran layar — supaya PDF
+      // yang dihasilkan benar-benar ready-to-print sesuai spesifikasi, bukan
+      // hasil "print" halaman web.
+      const widthMm = isSizeB ? 170 : 230;
+      const heightMm = isSizeB ? 230 : 340;
+
+      const pdf = new jsPDF({
+        orientation: heightMm >= widthMm ? "portrait" : "landscape",
+        unit: "mm",
+        format: [widthMm, heightMm],
+      });
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, widthMm, heightMm);
+      pdf.save(`${fileBaseName}.pdf`);
     }
   };
 
@@ -398,39 +414,34 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
   const flatH = Math.round(flatW / ratio);
 
   return (
-    <div className="min-h-screen bg-stone-100 flex flex-col" id="preview-page-wrapper">
+    <div className="min-h-screen bg-canvas flex flex-col" id="preview-page-wrapper">
 
       {/* Navbar */}
-      <header className="bg-white border-b border-stone-200 h-14 flex items-center justify-between px-5 shrink-0 z-10" id="preview-header">
-        <button
-          onClick={onBackToEditor}
-          className="flex items-center gap-2 text-sm font-medium text-stone-600 hover:text-stone-900 cursor-pointer transition"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span>Kembali ke Editor</span>
-        </button>
-
-        <div className="flex items-center gap-1.5 bg-stone-100 rounded-lg p-1" id="mode-toggle">
-          {(["3d", "flat"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
-                mode === m
-                  ? "bg-white text-stone-900 shadow-sm"
-                  : "text-stone-500 hover:text-stone-700"
-              }`}
-            >
-              {m === "3d" ? "Tampilan 3D" : "Tampilan Rata"}
-            </button>
-          ))}
-        </div>
-
-        <div className="text-right hidden sm:block">
-          <p className="text-xs font-bold text-stone-800">{project.name}</p>
-          <p className="text-[10px] text-stone-400">{project.productType}</p>
-        </div>
-      </header>
+      <PageHeader
+        onBack={onBackToEditor}
+        backLabel="Kembali ke Editor"
+        title={project.name}
+        subtitle={project.productType}
+        className="h-14"
+        containerClassName="max-w-none"
+        right={
+          <div className="flex items-center gap-1.5 bg-stone-100 rounded-lg p-1" id="mode-toggle">
+            {(["3d", "flat"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
+                  mode === m
+                    ? "bg-white text-stone-900 shadow-sm"
+                    : "text-stone-500 hover:text-stone-700"
+                }`}
+              >
+                {m === "3d" ? "Tampilan 3D" : "Tampilan Rata"}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {/* Main split layout */}
       <main className="flex-grow flex flex-col lg:flex-row gap-0" id="preview-main">
@@ -549,27 +560,18 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
 
           {/* Download Actions */}
           <div className="p-5 border-t border-stone-100 space-y-2.5">
-            <button
-              onClick={() => generateHighResFile("png")}
-              className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm transition"
-            >
+            <Button variant="primary" size="lg" className="w-full" onClick={() => generateHighResFile("png")}>
               <Download className="w-4 h-4" />
               <span>Unduh PNG (Resolusi Tinggi)</span>
-            </button>
-            <button
-              onClick={() => generateHighResFile("pdf")}
-              className="w-full py-3 bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-700 font-semibold rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer transition"
-            >
+            </Button>
+            <Button variant="secondary" size="lg" className="w-full" onClick={() => generateHighResFile("pdf")}>
               <FileText className="w-4 h-4 text-rose-400" />
               <span>Simpan sebagai PDF</span>
-            </button>
-            <button
-              onClick={onBackToEditor}
-              className="w-full py-2.5 text-stone-400 hover:text-stone-700 text-xs font-medium rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition"
-            >
+            </Button>
+            <Button variant="ghost" size="md" className="w-full" onClick={onBackToEditor}>
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Kembali Edit Desain</span>
-            </button>
+            </Button>
           </div>
         </div>
       </main>
