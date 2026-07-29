@@ -6,6 +6,7 @@ import {
   SekolahCandidate,
 } from "@/lib/kemendikdasmen";
 import { rankCandidates, shouldAutoSelect, ScoredCandidate } from "@/lib/fuzzyMatch";
+import { getErrorMessage } from "@/lib/utils";
 
 function candidateSuggestions(ranked: ScoredCandidate<SekolahCandidate>[]) {
   return ranked.map(({ candidate: c, score }) => ({
@@ -86,12 +87,12 @@ export async function POST(req: NextRequest) {
         sumber: "sekolah.data.kemendikdasmen.go.id",
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Pencarian data sekolah gagal:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Gagal memproses pencarian data sekolah.",
+        error: getErrorMessage(error, "Gagal memproses pencarian data sekolah."),
       },
       { status: 500 }
     );

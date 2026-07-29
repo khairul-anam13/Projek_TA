@@ -6,6 +6,7 @@ import { removeBackground, Config } from '@imgly/background-removal';
 import { traceDataUrl, getSVG } from '@cadit-app/potrace-ts';
 import { createClient } from "@/lib/supabase/client";
 import { Button, IconButton } from "@/components/ui";
+import { getErrorMessage } from "@/lib/utils";
 
 interface Props {
   onInsertSVG: (svgString: string) => void;
@@ -139,10 +140,10 @@ export default function ImageToVectorConverter({ onInsertSVG, onClose }: Props) 
       // Save to Supabase Storage in the background
       saveToSupabase(file, svgString);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setStatus("error");
-      setErrorMsg(err.message || "Failed to process image.");
+      setErrorMsg(getErrorMessage(err, "Failed to process image."));
     }
   };
 

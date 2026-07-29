@@ -15,6 +15,9 @@ import {
   MATERIAL_TEXTURE_NUM_OCTAVES,
   MATERIAL_TEXTURE_COLOR_MATRIX_VALUES,
 } from "../lib/materialTexture";
+import { getCardRatio, getMikaOverlayRect, getPrintSizeMm, sortByZIndex } from "../lib/canvasConstraints";
+import { getLogoIconMarkup, getLogoIconSvgString } from "../lib/logoIcons";
+import { prepareCustomSvgMarkup } from "../lib/svgUtils";
 import CanvasFitText from "./CanvasFitText";
 
 interface PreviewPageProps {
@@ -64,31 +67,12 @@ function SvgElement({
   }
 
   if (el.type === "logo") {
-    const iconPaths: Record<string, React.ReactNode> = {
-      sparkles: (
-        <path fill={el.color || "#000"} d="M50,0 L57,37 L94,44 L57,51 L50,88 L43,51 L6,44 L43,37 Z M25,12 L28,21 L37,23 L28,25 L25,34 L22,25 L13,23 L22,21 Z" />
-      ),
-      mortarboard: (
-        <g fill={el.color || "#000"}>
-          <polygon points="50,15 90,35 50,55 10,35" />
-          <polygon points="25,48 25,75 50,88 75,75 75,48 50,60" />
-          <polygon points="85,35 85,65 89,68 89,37" />
-        </g>
-      ),
-      shield: (
-        <path fill={el.color || "#000"} d="M50,10 C70,10 85,18 85,18 C85,18 85,55 50,85 C15,55 15,18 15,18 C15,18 30,10 50,10 Z" />
-      ),
-      leaf: (
-        <path fill={el.color || "#000"} d="M15,90 C15,90 35,40 85,15 C85,15 80,50 50,75 C30,92 15,90 15,90 Z" />
-      ),
-      building: (
-        <path fill={el.color || "#000"} stroke={el.color || "#000"} strokeWidth="4" strokeLinecap="round" d="M10,90 L90,90 M20,90 L20,30 L50,10 L80,30 L80,90 M30,40 L40,40 M30,55 L40,55 M60,40 L70,40 M60,55 L70,55" />
-      ),
-    };
     return (
-      <svg x={ex} y={ey} width={ew} height={eh} viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-        {iconPaths[el.logoIcon ?? ""] ?? <circle cx="50" cy="50" r="40" fill={el.color || "#000"} />}
-      </svg>
+      <svg
+        x={ex} y={ey} width={ew} height={eh}
+        viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"
+        dangerouslySetInnerHTML={{ __html: getLogoIconMarkup(el.logoIcon, el.color || "#000") }}
+      />
     );
   }
 
@@ -107,16 +91,12 @@ function SvgElement({
 
   if (el.type === "custom_svg" && el.customSvg) {
     return (
-      <g dangerouslySetInnerHTML={{ 
-        __html: el.customSvg
-          .replace(/fill="[^"]*"/g, `fill="${el.color || '#000000'}"`)
-          .replace(/<svg([^>]*)>/, (match, p1) => {
-            let attrs = p1.replace(/\s(x|y|width|height)="[^"]*"/g, '');
-            if (!attrs.includes("preserveAspectRatio")) {
-              attrs += ' preserveAspectRatio="xMidYMid meet"';
-            }
-            return `<svg x="${el.x}%" y="${el.y}%" width="${el.width}%" height="${el.height}%" ${attrs} overflow="visible">`;
-          })
+      <g dangerouslySetInnerHTML={{
+        __html: prepareCustomSvgMarkup(
+          el.customSvg,
+          el.color || '#000000',
+          `x="${el.x}%" y="${el.y}%" width="${el.width}%" height="${el.height}%" overflow="visible"`
+        )
       }} />
     );
   }
@@ -138,8 +118,8 @@ function DesignCanvas({ project, width, height, borderRadius = 8, isExport = fal
   borderRadius?: number;
   isExport?: boolean;
 }) {
-  const sorted = [...project.elements].sort((a, b) => a.zIndex - b.zIndex);
-  const isSizeB = project.printSize === "Size B (17x23cm)";
+  const sorted = sortByZIndex(project.elements);
+  const mikaRect = getMikaOverlayRect(project.printSize);
   return (
     <div
       style={{
@@ -178,10 +158,10 @@ function DesignCanvas({ project, width, height, borderRadius = 8, isExport = fal
         {!isExport && (
           <image
             href="/mika-nama.png"
-            x={isSizeB ? '11.76%' : '21.73%'}
-            y={isSizeB ? '50%' : '66.17%'}
-            width={isSizeB ? '76.47%' : '56.52%'}
-            height={isSizeB ? '19.56%' : '13.23%'}
+            x={`${mikaRect.xPct}%`}
+            y={`${mikaRect.yPct}%`}
+            width={`${mikaRect.widthPct}%`}
+            height={`${mikaRect.heightPct}%`}
             preserveAspectRatio="none"
             pointerEvents="none"
           />
@@ -219,8 +199,7 @@ function ThreeDMockup({ project }: { project: DesignProject }) {
   };
 
   // Aspect ratio based on size
-  const isSizeB = project.printSize === "Size B (17x23cm)";
-  const ratio = isSizeB ? (17 / 23) : (23 / 34);
+  const ratio = getCardRatio(project.printSize);
   const cardW = 300;
   const cardH = Math.round(cardW / ratio);
 
@@ -317,11 +296,25 @@ function ThreeDMockup({ project }: { project: DesignProject }) {
 
 export default function PreviewPage({ project, onBackToEditor }: PreviewPageProps) {
   const [mode, setMode] = useState<"3d" | "flat">("3d");
+  const [exportingFormat, setExportingFormat] = useState<"png" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const generateHighResFile = async (format: "png" | "pdf") => {
+    setExportError(null);
+    setExportingFormat(format);
+    try {
+      await renderAndDownload(format);
+    } catch (err) {
+      console.error("Gagal membuat file ekspor:", err);
+      setExportError("Gagal membuat file ekspor. Coba lagi.");
+    } finally {
+      setExportingFormat(null);
+    }
+  };
+
+  const renderAndDownload = async (format: "png" | "pdf") => {
     const scaleFactor = 2;
-    const isSizeB = project.printSize === "Size B (17x23cm)";
-    const ratio = isSizeB ? (17 / 23) : (23 / 34);
+    const ratio = getCardRatio(project.printSize);
     const baseW = 800;
     const baseH = Math.round(baseW / ratio);
     const canvasW = baseW * scaleFactor;
@@ -331,7 +324,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
     canvas.width = canvasW;
     canvas.height = canvasH;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) throw new Error("Canvas 2D context tidak tersedia di browser ini.");
 
     ctx.fillStyle = project.materialColor || project.backgroundColor || "#ffffff";
     ctx.fillRect(0, 0, canvasW, canvasH);
@@ -355,7 +348,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
       img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(materialTextureSvgString(canvasW, canvasH))}`;
     });
 
-    const sorted = [...project.elements].sort((a, b) => a.zIndex - b.zIndex);
+    const sorted = sortByZIndex(project.elements);
 
     for (const el of sorted) {
       ctx.save();
@@ -403,14 +396,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
           img.src = el.imageUrl!;
         });
       } else if (el.type === "custom_svg" && el.customSvg) {
-        let str = el.customSvg.replace(/fill="[^"]*"/g, `fill="${el.color || '#000000'}"`);
-        str = str.replace(/<svg([^>]*)>/, (match, p1) => {
-          let attrs = p1.replace(/\s(x|y|width|height)="[^"]*"/g, '');
-          if (!attrs.includes("preserveAspectRatio")) {
-            attrs += ' preserveAspectRatio="xMidYMid meet"';
-          }
-          return `<svg width="${drawW}" height="${drawH}" ${attrs}>`;
-        });
+        const str = prepareCustomSvgMarkup(el.customSvg, el.color || '#000000', `width="${drawW}" height="${drawH}"`);
 
         await new Promise<void>((resolve) => {
           const img = new Image();
@@ -422,16 +408,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
           img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(str)}`;
         });
       } else if (el.type === "logo") {
-        const c = el.color || "#000";
-        const iconSvgContent: Record<string, string> = {
-          sparkles: `<path fill="${c}" d="M50,0 L57,37 L94,44 L57,51 L50,88 L43,51 L6,44 L43,37 Z M25,12 L28,21 L37,23 L28,25 L25,34 L22,25 L13,23 L22,21 Z"/>`,
-          mortarboard: `<g fill="${c}"><polygon points="50,15 90,35 50,55 10,35"/><polygon points="25,48 25,75 50,88 75,75 75,48 50,60"/><polygon points="85,35 85,65 89,68 89,37"/></g>`,
-          shield: `<path fill="${c}" d="M50,10 C70,10 85,18 85,18 C85,18 85,55 50,85 C15,55 15,18 15,18 C15,18 30,10 50,10 Z"/>`,
-          leaf: `<path fill="${c}" d="M15,90 C15,90 35,40 85,15 C85,15 80,50 50,75 C30,92 15,90 15,90 Z"/>`,
-          building: `<path fill="${c}" stroke="${c}" stroke-width="4" stroke-linecap="round" d="M10,90 L90,90 M20,90 L20,30 L50,10 L80,30 L80,90 M30,40 L40,40 M30,55 L40,55 M60,40 L70,40 M60,55 L70,55"/>`,
-        };
-        const inner = iconSvgContent[el.logoIcon ?? ""] ?? `<circle cx="50" cy="50" r="40" fill="${c}"/>`;
-        const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${drawW}" height="${drawH}" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">${inner}</svg>`;
+        const svgStr = getLogoIconSvgString(el.logoIcon, el.color || "#000", drawW, drawH);
 
         await new Promise<void>((resolve) => {
           const img = new Image();
@@ -447,14 +424,17 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
     }
 
     // Gambar overlay mika nama di atas semua elemen
+    const mikaRect = getMikaOverlayRect(project.printSize);
     await new Promise<void>((resolve) => {
       const mikaImg = new Image();
       mikaImg.onload = () => {
-        const mx = (isSizeB ? 11.76 : 21.73) / 100 * canvasW;
-        const my = (isSizeB ? 50 : 66.17) / 100 * canvasH;
-        const mw = (isSizeB ? 76.47 : 56.52) / 100 * canvasW;
-        const mh = (isSizeB ? 19.56 : 13.23) / 100 * canvasH;
-        ctx.drawImage(mikaImg, mx, my, mw, mh);
+        ctx.drawImage(
+          mikaImg,
+          (mikaRect.xPct / 100) * canvasW,
+          (mikaRect.yPct / 100) * canvasH,
+          (mikaRect.widthPct / 100) * canvasW,
+          (mikaRect.heightPct / 100) * canvasH
+        );
         resolve();
       };
       mikaImg.onerror = () => resolve();
@@ -472,8 +452,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
       // Ukuran fisik cetak sebenarnya (mm), bukan ukuran layar — supaya PDF
       // yang dihasilkan benar-benar ready-to-print sesuai spesifikasi, bukan
       // hasil "print" halaman web.
-      const widthMm = isSizeB ? 170 : 230;
-      const heightMm = isSizeB ? 230 : 340;
+      const { widthMm, heightMm } = getPrintSizeMm(project.printSize);
 
       const pdf = new jsPDF({
         orientation: heightMm >= widthMm ? "portrait" : "landscape",
@@ -485,8 +464,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
     }
   };
 
-  const isSizeB = project.printSize === "Size B (17x23cm)";
-  const ratio = isSizeB ? (17 / 23) : (23 / 34);
+  const ratio = getCardRatio(project.printSize);
   const flatW = 280;
   const flatH = Math.round(flatW / ratio);
 
@@ -637,13 +615,30 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
 
           {/* Download Actions */}
           <div className="p-5 border-t border-stone-100 space-y-2.5">
-            <Button variant="primary" size="lg" className="w-full" onClick={() => generateHighResFile("png")}>
+            {exportError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                {exportError}
+              </p>
+            )}
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full"
+              disabled={exportingFormat !== null}
+              onClick={() => generateHighResFile("png")}
+            >
               <Download className="w-4 h-4" />
-              <span>Unduh PNG (Resolusi Tinggi)</span>
+              <span>{exportingFormat === "png" ? "Menyiapkan PNG…" : "Unduh PNG (Resolusi Tinggi)"}</span>
             </Button>
-            <Button variant="secondary" size="lg" className="w-full" onClick={() => generateHighResFile("pdf")}>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="w-full"
+              disabled={exportingFormat !== null}
+              onClick={() => generateHighResFile("pdf")}
+            >
               <FileText className="w-4 h-4 text-rose-400" />
-              <span>Simpan sebagai PDF</span>
+              <span>{exportingFormat === "pdf" ? "Menyiapkan PDF…" : "Simpan sebagai PDF"}</span>
             </Button>
             <Button variant="ghost" size="md" className="w-full" onClick={onBackToEditor}>
               <RotateCcw className="w-3.5 h-3.5" />

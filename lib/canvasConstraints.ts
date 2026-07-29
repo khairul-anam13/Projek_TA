@@ -229,6 +229,34 @@ export function getCardRatio(printSize: DesignProject["printSize"]): number {
   return printSize === "Size B (17x23cm)" ? 17 / 23 : 23 / 34;
 }
 
+/** Ukuran fisik cetak sebenarnya dalam mm, dipakai agar PDF hasil ekspor ready-to-print sesuai spesifikasi. */
+export function getPrintSizeMm(printSize: DesignProject["printSize"]): { widthMm: number; heightMm: number } {
+  return printSize === "Size B (17x23cm)" ? { widthMm: 170, heightMm: 230 } : { widthMm: 230, heightMm: 340 };
+}
+
+export interface MikaOverlayRect {
+  xPct: number;
+  yPct: number;
+  widthPct: number;
+  heightPct: number;
+}
+
+/**
+ * Posisi & ukuran overlay mika nama (jendela plastik fisik), sebagai
+ * persentase kanvas — berbeda per ukuran cetak. Sumber tunggal dipakai oleh
+ * editor, preview, dan pipeline ekspor supaya ketiganya tidak pernah drift.
+ */
+export function getMikaOverlayRect(printSize: DesignProject["printSize"]): MikaOverlayRect {
+  return printSize === "Size B (17x23cm)"
+    ? { xPct: 11.76, yPct: 50, widthPct: 76.47, heightPct: 19.56 }
+    : { xPct: 21.73, yPct: 66.17, widthPct: 56.52, heightPct: 13.23 };
+}
+
+/** Mengurutkan elemen kanvas berdasarkan zIndex (urutan tumpuk render), tanpa memutasi array asal. */
+export function sortByZIndex(elements: CanvasElement[]): CanvasElement[] {
+  return [...elements].sort((a, b) => a.zIndex - b.zIndex);
+}
+
 /**
  * Menghitung dimensi gambar yang diimpor agar proporsional, dibatasi
  * maksimal 30% lebar kanvas dan 40% tinggi kanvas.

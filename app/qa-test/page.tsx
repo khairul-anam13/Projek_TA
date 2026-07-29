@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { notFound } from "next/navigation";
 import PreviewPage from "@/components/PreviewPage";
 import { getMockupTemplate } from "@/lib/mockupTemplates";
 import { drawTextInBox } from "@/lib/textLayout";
@@ -79,7 +80,13 @@ function ExportCanvasPreview({ project }: { project: DesignProject }) {
   return <canvas ref={canvasRef} style={{ width: 400, border: "1px solid #ccc" }} />;
 }
 
+// Halaman debug visual internal — bukan bagian dari alur aplikasi, tidak
+// perlu (dan tidak boleh) reachable di production.
 export default function QaPage() {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+
   return (
     <div style={{ padding: 24, display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
       <div>

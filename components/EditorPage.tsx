@@ -9,6 +9,8 @@ import {
   applySnap,
   enforceMikaConstraint,
   getCardRatio,
+  getMikaOverlayRect,
+  sortByZIndex,
   computeImageImportSize,
   computeResize,
   ResizeHandle,
@@ -20,6 +22,8 @@ import {
   MATERIAL_TEXTURE_NUM_OCTAVES,
   MATERIAL_TEXTURE_COLOR_MATRIX_VALUES,
 } from "../lib/materialTexture";
+import { getLogoIconMarkup, LOGO_ICON_LIST } from "../lib/logoIcons";
+import { prepareCustomSvgMarkup } from "../lib/svgUtils";
 import {
   Undo,
   Redo,
@@ -52,7 +56,7 @@ import {
 } from "lucide-react";
 import ImageToVectorConverter from "./ImageToVectorConverter";
 import { Button, IconButton, Card } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { cn, generateId } from "@/lib/utils";
 
 interface EditorPageProps {
   project: DesignProject;
@@ -88,27 +92,6 @@ const MATERIAL_COLORS = [
 
 const fieldClass =
   "bg-white border border-stone-200 rounded-lg px-2 py-1.5 text-xs text-stone-700 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
-
-function generateId(prefix: string): string {
-  return `${prefix}_${Math.random().toString(36).substring(2, 9)}`;
-}
-
-function renderLogoSvg(icon: string, color: string) {
-  switch (icon) {
-    case "sparkles":
-      return <path fill={color} d="M50,0 L57,37 L94,44 L57,51 L50,88 L43,51 L6,44 L43,37 Z M25,12 L28,21 L37,23 L28,25 L25,34 L22,25 L13,23 L22,21 Z" />;
-    case "mortarboard":
-      return <g fill={color}><polygon points="50,15 90,35 50,55 10,35" /><polygon points="25,48 25,75 50,88 75,75 75,48 50,60" /><polygon points="85,35 85,65 89,68 89,37" /></g>;
-    case "shield":
-      return <path fill={color} d="M50,10 C70,10 85,18 85,18 C85,18 85,55 50,85 C15,55 15,18 15,18 C15,18 30,10 50,10 Z" />;
-    case "leaf":
-      return <path fill={color} d="M15,90 C15,90 35,40 85,15 C85,15 80,50 50,75 C30,92 15,90 15,90 Z" />;
-    case "building":
-      return <path fill={color} stroke={color} strokeWidth="4" strokeLinecap="round" d="M10,90 L90,90 M20,90 L20,30 L50,10 L80,30 L80,90 M30,40 L40,40 M30,55 L40,55 M60,40 L70,40 M60,55 L70,55" />;
-    default:
-      return <circle cx="50" cy="50" r="40" fill={color} />;
-  }
-}
 
 export default function EditorPage({
   project: initialProject,
@@ -155,6 +138,29 @@ export default function EditorPage({
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 2500);
   }, []);
+
+  // Dipakai bersama oleh tombol Save dan pintasan Ctrl+S, supaya keduanya
+  // selalu berperilaku identik alih-alih Ctrl+S diam-diam tidak melakukan
+  // apa pun seperti sebelumnya (tooltip tombol menjanjikan pintasan ini,
+  // tapi listener keydown tidak pernah benar-benar menanganinya).
+  const handleSave = useCallback(() => {
+    if (isSaving) return;
+    const savePromise = (async () => {
+      setIsSaving(true);
+      try {
+        const { persisted } = await onSaveProject(project);
+        toast(persisted ? "Proyek tersimpan" : "Tersimpan lokal — server tidak merespons");
+      } catch {
+        toast("Gagal menyimpan proyek. Coba lagi.");
+      } finally {
+        setIsSaving(false);
+      }
+    })();
+    pendingSaveRef.current = savePromise;
+    savePromise.finally(() => {
+      if (pendingSaveRef.current === savePromise) pendingSaveRef.current = null;
+    });
+  }, [isSaving, onSaveProject, project, toast]);
 
   const pushHistory = useCallback((elements: CanvasElement[]) => {
     setHistory((h) => {
@@ -432,6 +438,7 @@ export default function EditorPage({
       if (e.ctrlKey && e.key === "z") { e.preventDefault(); handleUndo(); return; }
       if (e.ctrlKey && e.key === "y") { e.preventDefault(); handleRedo(); return; }
       if (e.ctrlKey && e.key === "d") { e.preventDefault(); duplicateSelected(); return; }
+      if (e.ctrlKey && e.key === "s") { e.preventDefault(); handleSave(); return; }
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId) { e.preventDefault(); deleteSelected(); return; }
 
       if (!selectedId) return;
@@ -451,14 +458,14 @@ export default function EditorPage({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, handleUndo, handleRedo, duplicateSelected, deleteSelected, updateElement, project.elements]);
+  }, [selectedId, handleUndo, handleRedo, duplicateSelected, deleteSelected, handleSave, updateElement, project.elements]);
 
 
   const selectedEl = project.elements.find((e) => e.id === selectedId);
-  const isSizeB = project.printSize === "Size B (17x23cm)";
-  const ratio = isSizeB ? (17 / 23) : (23 / 34);
+  const ratio = getCardRatio(project.printSize);
   const canvasW = 400 * zoom;
   const canvasH = Math.round(canvasW / ratio);
+  const mikaRect = getMikaOverlayRect(project.printSize);
 
   const handleColorClick = (hex: string) => {
     if (selectedEl) {
@@ -547,23 +554,7 @@ export default function EditorPage({
           variant="secondary"
           size="sm"
           disabled={isSaving}
-          onClick={() => {
-            const savePromise = (async () => {
-              setIsSaving(true);
-              try {
-                const { persisted } = await onSaveProject(project);
-                toast(persisted ? "Proyek tersimpan" : "Tersimpan lokal — server tidak merespons");
-              } catch {
-                toast("Gagal menyimpan proyek. Coba lagi.");
-              } finally {
-                setIsSaving(false);
-              }
-            })();
-            pendingSaveRef.current = savePromise;
-            savePromise.finally(() => {
-              if (pendingSaveRef.current === savePromise) pendingSaveRef.current = null;
-            });
-          }}
+          onClick={handleSave}
           title="Simpan Proyek (Ctrl+S)"
         >
           {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
@@ -652,7 +643,7 @@ export default function EditorPage({
 
             {/* SVG elements */}
             <svg className="absolute inset-0 w-full h-full" id="canvas-svg" style={{zIndex: 2}}>
-              {[...project.elements].sort((a, b) => a.zIndex - b.zIndex).map((el) => {
+              {sortByZIndex(project.elements).map((el) => {
                 const ex = `${el.x}%`, ey = `${el.y}%`, ew = `${el.width}%`, eh = `${el.height}%`;
                 const sel = el.id === selectedId;
                 return (
@@ -673,9 +664,11 @@ export default function EditorPage({
                       <line x1={ex} y1={ey} x2={`${el.x + el.width}%`} y2={ey} stroke={el.color || "#000"} strokeWidth={el.height || 2} />
                     )}
                     {el.type === "logo" && (
-                      <svg x={ex} y={ey} width={ew} height={eh} viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-                        {renderLogoSvg(el.logoIcon || "sparkles", el.color || "#000")}
-                      </svg>
+                      <svg
+                        x={ex} y={ey} width={ew} height={eh}
+                        viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"
+                        dangerouslySetInnerHTML={{ __html: getLogoIconMarkup(el.logoIcon || "sparkles", el.color || "#000") }}
+                      />
                     )}
                     {el.type === "text" && el.text && (
                       <CanvasFitText
@@ -687,15 +680,11 @@ export default function EditorPage({
                     )}
                     {el.type === "custom_svg" && el.customSvg && (
                       <g dangerouslySetInnerHTML={{
-                        __html: el.customSvg
-                          .replace(/fill="[^"]*"/g, `fill="${el.color || '#000000'}"`)
-                          .replace(/<svg([^>]*)>/, (match, p1) => {
-                            let attrs = p1.replace(/\s(x|y|width|height)="[^"]*"/g, '');
-                            if (!attrs.includes("preserveAspectRatio")) {
-                              attrs += ' preserveAspectRatio="xMidYMid meet"';
-                            }
-                            return `<svg x="${el.x}%" y="${el.y}%" width="${el.width}%" height="${el.height}%" ${attrs} overflow="visible">`;
-                          })
+                        __html: prepareCustomSvgMarkup(
+                          el.customSvg,
+                          el.color || '#000000',
+                          `x="${el.x}%" y="${el.y}%" width="${el.width}%" height="${el.height}%" overflow="visible"`
+                        )
                       }} />
                     )}
                     {el.type === "image" && el.imageUrl && (
@@ -747,10 +736,10 @@ export default function EditorPage({
               {/* Mika Nama Overlay */}
               <image
                 href="/mika-nama.png"
-                x={isSizeB ? '11.76%' : '21.73%'}
-                y={isSizeB ? '50%' : '66.17%'}
-                width={isSizeB ? '76.47%' : '56.52%'}
-                height={isSizeB ? '19.56%' : '13.23%'}
+                x={`${mikaRect.xPct}%`}
+                y={`${mikaRect.yPct}%`}
+                width={`${mikaRect.widthPct}%`}
+                height={`${mikaRect.heightPct}%`}
                 preserveAspectRatio="none"
                 pointerEvents="none"
               />
@@ -841,8 +830,9 @@ export default function EditorPage({
                         <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Warna Dasar Bahan (ASE/Kulit)</label>
                         <div className="grid grid-cols-6 gap-1.5">
                           {MATERIAL_COLORS.map(c => (
-                            <div
+                            <button
                               key={c.hex}
+                              type="button"
                               onClick={() => setProject({...project, materialColor: c.hex})}
                               className={cn(
                                 "w-full aspect-square rounded-md cursor-pointer border-2",
@@ -852,6 +842,8 @@ export default function EditorPage({
                               )}
                               style={{backgroundColor: c.hex}}
                               title={c.name}
+                              aria-label={c.name}
+                              aria-pressed={project.materialColor === c.hex || (!project.materialColor && project.backgroundColor === c.hex)}
                             />
                           ))}
                         </div>
@@ -993,8 +985,8 @@ export default function EditorPage({
                           <div className="w-8 h-8 rounded-lg border-2 border-amber-500 flex items-center justify-center font-bold text-[9px] text-white shadow-sm" style={{background: "linear-gradient(135deg, #FFD700, #DAA520)"}} title="Emas Foil">Emas</div>
                         ) : (
                           <>
-                            <div onClick={() => commitUpdate(selectedId!, { color: "#FFFFFF" })} className={cn("w-8 h-8 rounded-lg border-2 cursor-pointer", selectedEl.color === "#FFFFFF" ? "border-brand-500 shadow-sm" : "border-stone-300")} style={{backgroundColor: "#FFFFFF"}} title="Putih"></div>
-                            <div onClick={() => commitUpdate(selectedId!, { color: "#111111" })} className={cn("w-8 h-8 rounded-lg border-2 cursor-pointer", selectedEl.color === "#111111" ? "border-brand-500 shadow-sm" : "border-stone-300")} style={{backgroundColor: "#111111"}} title="Hitam"></div>
+                            <button type="button" onClick={() => commitUpdate(selectedId!, { color: "#FFFFFF" })} className={cn("w-8 h-8 rounded-lg border-2 cursor-pointer", selectedEl.color === "#FFFFFF" ? "border-brand-500 shadow-sm" : "border-stone-300")} style={{backgroundColor: "#FFFFFF"}} title="Putih" aria-label="Putih" aria-pressed={selectedEl.color === "#FFFFFF"}></button>
+                            <button type="button" onClick={() => commitUpdate(selectedId!, { color: "#111111" })} className={cn("w-8 h-8 rounded-lg border-2 cursor-pointer", selectedEl.color === "#111111" ? "border-brand-500 shadow-sm" : "border-stone-300")} style={{backgroundColor: "#111111"}} title="Hitam" aria-label="Hitam" aria-pressed={selectedEl.color === "#111111"}></button>
                           </>
                         )}
                       </div>
@@ -1068,15 +1060,12 @@ export default function EditorPage({
                 <Card className="p-3">
                   <p className="font-bold text-stone-700 mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wide"><Sparkles size={14}/> Stamps & Icons</p>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { icon: "mortarboard", label: "Toga" },
-                      { icon: "shield", label: "Perisai" },
-                      { icon: "sparkles", label: "Bintang" },
-                      { icon: "leaf", label: "Daun" },
-                      { icon: "building", label: "Gedung" },
-                    ].map(s => (
+                    {LOGO_ICON_LIST.map(s => (
                       <button key={s.icon} onClick={() => addElement('logo', {logoIcon: s.icon, width: 15, height: 15})} className="flex flex-col items-center p-2.5 bg-stone-50 border border-stone-200 hover:border-brand-300 hover:bg-brand-50/50 rounded-lg transition cursor-pointer">
-                        <svg className="w-6 h-6 fill-current text-stone-600 mb-1" viewBox="0 0 100 100">{renderLogoSvg(s.icon, "currentColor")}</svg>
+                        <svg
+                          className="w-6 h-6 fill-current text-stone-600 mb-1" viewBox="0 0 100 100"
+                          dangerouslySetInnerHTML={{ __html: getLogoIconMarkup(s.icon, "currentColor") }}
+                        />
                         <span className="text-[10px] text-stone-500">{s.label}</span>
                       </button>
                     ))}

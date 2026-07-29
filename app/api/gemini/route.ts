@@ -1,10 +1,7 @@
 import Groq from "groq-sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { sanitizeLayoutElements } from "@/lib/canvasConstraints";
-
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+import { getErrorMessage } from "@/lib/utils";
 
 const LAYOUT_SCHEMA = {
   type: "object",
@@ -50,6 +47,13 @@ const LAYOUT_SCHEMA = {
 
 export async function POST(req: NextRequest) {
   try {
+    // Dibuat per-request, bukan di module scope: konstruktor Groq melempar
+    // error secara sinkron kalau GROQ_API_KEY kosong, yang sebelumnya
+    // membuat langkah "collecting page data" saat next build gagal total di
+    // lingkungan mana pun tanpa secret tersebut ter-set (termasuk saat build
+    // lokal/CI sebelum secret di-deploy) — bukan hanya saat rute ini benar-benar dipanggil.
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
     const { mockupType, dynamicData } = await req.json();
 
     if (!mockupType || !dynamicData) {
@@ -114,12 +118,12 @@ Provide a short "description" (in Indonesian) explaining why this layout and hie
     }
 
     return NextResponse.json({ success: true, result: parsedResult });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Groq AI API generation failed:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Gagal menghubungi AI Server.",
+        error: getErrorMessage(error, "Gagal menghubungi AI Server."),
       },
       { status: 500 }
     );

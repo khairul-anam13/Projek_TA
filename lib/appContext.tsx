@@ -13,6 +13,7 @@ interface AppContextValue {
   projectsLoading: boolean;
   setProjects: React.Dispatch<React.SetStateAction<DesignProject[]>>;
   refetchProjects: () => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -70,9 +71,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (user) {
+      // Fetch-on-mount/user-change yang wajar; fetchProjects() men-set
+      // projectsLoading segera saat dipanggil (sebelum await pertama), yang
+      // secara teknis kena kaidah "no setState sinkron di effect" — tapi
+      // menunda-tunda ini lewat pola lain akan mengubah kapan spinner
+      // loading proyek muncul, jadi sengaja tidak diubah tanpa uji end-to-end.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchProjects();
     }
   }, [user, fetchProjects]);
+
+  // Dipakai bersama oleh Dashboard & History — dulu di-duplikasi identik di
+  // kedua halaman, termasuk bug yang sama: response non-2xx dari DELETE
+  // (mis. RLS/auth error) tidak pernah dicek, jadi proyek yang GAGAL dihapus
+  // di server tetap hilang dari daftar di layar karena sudah dihapus secara
+  // optimistic duluan.
+  const deleteProject = useCallback(async (id: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus proyek desain ini?")) return;
+
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+
+    try {
+      const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        throw new Error(`Hapus proyek gagal dengan status ${res.status}`);
+      }
+    } catch (e) {
+      console.error("[deleteProject] Gagal menghapus:", e);
+      alert("Gagal menghapus proyek. Coba lagi.");
+      await fetchProjects();
+    }
+  }, [fetchProjects]);
 
   if (authLoading) {
     return (
@@ -96,7 +125,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppContext.Provider
-      value={{ user, authLoading, projects, projectsLoading, setProjects, refetchProjects: fetchProjects }}
+      value={{ user, authLoading, projects, projectsLoading, setProjects, refetchProjects: fetchProjects, deleteProject }}
     >
       {children}
     </AppContext.Provider>

@@ -282,9 +282,11 @@ export default function CreateProjectPage({
                 <label className="block text-sm font-bold text-stone-700 mb-2">Jenis Mockup</label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {MOCKUPS.map((m) => (
-                    <div
+                    <button
                       key={m}
+                      type="button"
                       onClick={() => setMockupType(m)}
+                      aria-pressed={mockupType === m}
                       className={`px-4 py-3 rounded-xl border-2 cursor-pointer transition text-center text-sm font-semibold ${
                         mockupType === m
                           ? "border-brand-500 bg-brand-50 text-brand-700 shadow-sm"
@@ -292,7 +294,7 @@ export default function CreateProjectPage({
                       }`}
                     >
                       {m}
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>

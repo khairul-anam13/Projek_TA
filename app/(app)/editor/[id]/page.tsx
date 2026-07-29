@@ -98,8 +98,14 @@ export default function Editor() {
       onSaveProject={saveProject}
       onExport={async (exportProject) => {
         // Simpan dulu perubahan terbaru sebelum ke halaman preview, supaya
-        // preview tidak menampilkan versi lama yang belum di-save.
-        const { project: saved } = await saveProject(exportProject);
+        // preview tidak menampilkan versi lama yang belum di-save. Kalau
+        // save gagal benar-benar tersimpan di server (persisted: false),
+        // jangan lanjut ke preview seolah-olah berhasil — lempar error di
+        // sini supaya ditangkap oleh toast kegagalan ekspor di EditorPage.
+        const { project: saved, persisted } = await saveProject(exportProject);
+        if (!persisted) {
+          throw new Error("Proyek belum tersimpan di server, ekspor dibatalkan.");
+        }
         router.push(`/preview/${saved.id}`);
       }}
     />
