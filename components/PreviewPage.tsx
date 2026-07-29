@@ -81,6 +81,9 @@ function SvgElement({
       leaf: (
         <path fill={el.color || "#000"} d="M15,90 C15,90 35,40 85,15 C85,15 80,50 50,75 C30,92 15,90 15,90 Z" />
       ),
+      building: (
+        <path fill={el.color || "#000"} stroke={el.color || "#000"} strokeWidth="4" strokeLinecap="round" d="M10,90 L90,90 M20,90 L20,30 L50,10 L80,30 L80,90 M30,40 L40,40 M30,55 L40,55 M60,40 L70,40 M60,55 L70,55" />
+      ),
     };
     return (
       <svg x={ex} y={ey} width={ew} height={eh} viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
@@ -408,7 +411,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
           }
           return `<svg width="${drawW}" height="${drawH}" ${attrs}>`;
         });
-        
+
         await new Promise<void>((resolve) => {
           const img = new Image();
           img.onload = () => {
@@ -418,9 +421,45 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
           img.onerror = () => resolve();
           img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(str)}`;
         });
+      } else if (el.type === "logo") {
+        const c = el.color || "#000";
+        const iconSvgContent: Record<string, string> = {
+          sparkles: `<path fill="${c}" d="M50,0 L57,37 L94,44 L57,51 L50,88 L43,51 L6,44 L43,37 Z M25,12 L28,21 L37,23 L28,25 L25,34 L22,25 L13,23 L22,21 Z"/>`,
+          mortarboard: `<g fill="${c}"><polygon points="50,15 90,35 50,55 10,35"/><polygon points="25,48 25,75 50,88 75,75 75,48 50,60"/><polygon points="85,35 85,65 89,68 89,37"/></g>`,
+          shield: `<path fill="${c}" d="M50,10 C70,10 85,18 85,18 C85,18 85,55 50,85 C15,55 15,18 15,18 C15,18 30,10 50,10 Z"/>`,
+          leaf: `<path fill="${c}" d="M15,90 C15,90 35,40 85,15 C85,15 80,50 50,75 C30,92 15,90 15,90 Z"/>`,
+          building: `<path fill="${c}" stroke="${c}" stroke-width="4" stroke-linecap="round" d="M10,90 L90,90 M20,90 L20,30 L50,10 L80,30 L80,90 M30,40 L40,40 M30,55 L40,55 M60,40 L70,40 M60,55 L70,55"/>`,
+        };
+        const inner = iconSvgContent[el.logoIcon ?? ""] ?? `<circle cx="50" cy="50" r="40" fill="${c}"/>`;
+        const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${drawW}" height="${drawH}" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">${inner}</svg>`;
+
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, drawX, drawY, drawW, drawH);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgStr)}`;
+        });
       }
       ctx.restore();
     }
+
+    // Gambar overlay mika nama di atas semua elemen
+    await new Promise<void>((resolve) => {
+      const mikaImg = new Image();
+      mikaImg.onload = () => {
+        const mx = (isSizeB ? 11.76 : 21.73) / 100 * canvasW;
+        const my = (isSizeB ? 50 : 66.17) / 100 * canvasH;
+        const mw = (isSizeB ? 76.47 : 56.52) / 100 * canvasW;
+        const mh = (isSizeB ? 19.56 : 13.23) / 100 * canvasH;
+        ctx.drawImage(mikaImg, mx, my, mw, mh);
+        resolve();
+      };
+      mikaImg.onerror = () => resolve();
+      mikaImg.src = "/mika-nama.png";
+    });
 
     const fileBaseName = `PageFree-${project.name.replace(/\s+/g, "_")}-SampulRapor`;
 
