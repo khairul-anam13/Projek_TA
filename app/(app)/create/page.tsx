@@ -11,23 +11,20 @@ import { DesignProject } from "@/lib/types";
 const AI_RESULT_STORAGE_KEY = "pagefree:ai_recommendation";
 const FORM_DRAFT_STORAGE_KEY = "pagefree:create_form_draft";
 
-/** Rekomendasi cadangan (dipakai murni jika Groq API gagal/error jaringan). */
-function getFallbackRecommendation(_formPayload: any) {
+/**
+ * Rekomendasi cadangan (dipakai murni jika Groq API gagal/error jaringan).
+ * Bentuknya HARUS sama dengan hasil sukses /api/gemini (description,
+ * sub_information_options, layout_elements) karena AiResultPage.tsx dan
+ * handleUseDesign membaca field-field itu langsung tanpa fallback tambahan —
+ * versi sebelumnya memakai bentuk lama (color_palette/typography/layout/
+ * slogan) yang sudah tidak dipakai di mana pun, sehingga tombol "Gunakan
+ * Layout Ini" crash (`[...undefined]`) begitu Groq gagal.
+ */
+function getFallbackRecommendation(formPayload: any) {
   return {
-    color_palette: {
-      primary_color: "#1E3A8A",
-      secondary_color: "#1E3B8B",
-      accent_color: "#F59E0B",
-      explanation: "Konsep warna biru institusional dengan aksen emas yang hangat.",
-    },
-    typography: {
-      title_font: "Space Grotesk",
-      body_font: "Inter",
-      explanation: "Display sans modern berpadu seimbang dengan body text yang nyaman dibaca.",
-    },
-    layout: "Corporate",
-    slogan: "Cerdas, Berprestasi, Berkarakter Unggul.",
-    description: "Desain solid yang fokus pada kerapian margin, visibilitas tinggi, dan proporsi seimbang yang pas untuk kepentingan pencetakan massal.",
+    description: "AI sedang tidak tersedia — tata letak template standar digunakan sebagai gantinya. Anda tetap bisa mengeditnya di editor.",
+    sub_information_options: [] as string[],
+    layout_elements: getMockupTemplate(formPayload.mockupType, formPayload.dynamicData),
   };
 }
 

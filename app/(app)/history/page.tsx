@@ -15,7 +15,8 @@ export default function History() {
     setProjects((prev) => prev.filter((p) => p.id !== id));
 
     try {
-      await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
     } catch (e) {
       console.error("[handleDeleteProject] Gagal menghapus:", e);
       refetchProjects();

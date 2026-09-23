@@ -252,7 +252,11 @@ export default function EditorPage({
     if (!el) return;
     const newId = generateId("el");
     const newZ = Math.max(0, ...project.elements.map((e) => e.zIndex)) + 1;
-    const dup: CanvasElement = { ...el, id: newId, x: Math.min(el.x + 5, 80), y: Math.min(el.y + 5, 80), zIndex: newZ };
+    // Elemen terkunci-X tetap harus rata tengah, bukan ikut digeser +5 —
+    // dan hasil geser Y tidak boleh mendarat di Zona Mika (Y 50-80).
+    const newX = el.isLockedX ? el.x : Math.min(el.x + 5, 80);
+    const newY = enforceMikaConstraint(el.type, Math.min(el.y + 5, 80));
+    const dup: CanvasElement = { ...el, id: newId, x: newX, y: newY, zIndex: newZ };
     const next = [...project.elements, dup];
     setProject((p) => ({ ...p, elements: next }));
     setSelectedId(newId);
@@ -438,8 +442,8 @@ export default function EditorPage({
       const el = project.elements.find((x) => x.id === selectedId);
       const step = e.shiftKey ? 5 : 1;
       const move: Record<string, Partial<CanvasElement>> = {
-        ArrowUp: { y: Math.max(0, (el?.y ?? 0) - step) },
-        ArrowDown: { y: Math.min(95, (el?.y ?? 0) + step) },
+        ArrowUp: { y: enforceMikaConstraint(el?.type, Math.max(0, (el?.y ?? 0) - step)) },
+        ArrowDown: { y: enforceMikaConstraint(el?.type, Math.min(95, (el?.y ?? 0) + step)) },
       };
 
       if (!el?.isLockedX) {
@@ -459,14 +463,6 @@ export default function EditorPage({
   const ratio = isSizeB ? (17 / 23) : (23 / 34);
   const canvasW = 400 * zoom;
   const canvasH = Math.round(canvasW / ratio);
-
-  const handleColorClick = (hex: string) => {
-    if (selectedEl) {
-      commitUpdate(selectedEl.id, { color: hex });
-    } else {
-      setProject((p) => ({ ...p, backgroundColor: hex }));
-    }
-  };
 
   return (
     <div className="h-screen bg-canvas flex flex-col overflow-hidden font-sans text-[13px] text-stone-800 select-none">
@@ -578,6 +574,7 @@ export default function EditorPage({
               await onExport(project);
             } catch {
               toast("Gagal mengekspor proyek. Coba lagi.");
+            } finally {
               setIsExporting(false);
             }
           }}
@@ -667,7 +664,7 @@ export default function EditorPage({
                       <rect x={ex} y={ey} width={ew} height={eh} fill={el.color || "#000"} />
                     )}
                     {el.type === "shape" && el.shapeType === "circle" && (
-                      <circle cx={`${el.x + el.width / 2}%`} cy={`${el.y + el.width / 2}%`} r={`${el.width / 2}%`} fill={el.color || "#000"} />
+                      <ellipse cx={`${el.x + el.width / 2}%`} cy={`${el.y + el.height / 2}%`} rx={`${el.width / 2}%`} ry={`${el.height / 2}%`} fill={el.color || "#000"} />
                     )}
                     {el.type === "shape" && el.shapeType === "line" && (
                       <line x1={ex} y1={ey} x2={`${el.x + el.width}%`} y2={ey} stroke={el.color || "#000"} strokeWidth={el.height || 2} />

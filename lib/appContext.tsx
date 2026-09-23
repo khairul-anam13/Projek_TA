@@ -69,9 +69,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    if (user) {
-      fetchProjects();
-    }
+    if (!user) return;
+    // fetchProjects() sets loading state synchronously before its first
+    // `await` — calling it directly here would make that setState happen
+    // in the same synchronous pass as this effect, triggering a cascading
+    // render. Deferring to a microtask breaks that synchronous chain.
+    queueMicrotask(fetchProjects);
   }, [user, fetchProjects]);
 
   if (authLoading) {

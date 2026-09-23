@@ -43,10 +43,11 @@ function SvgElement({
     }
     if (el.shapeType === "circle") {
       return (
-        <circle
+        <ellipse
           cx={`${el.x + el.width / 2}%`}
-          cy={`${el.y + el.width / 2}%`}
-          r={`${el.width / 2}%`}
+          cy={`${el.y + el.height / 2}%`}
+          rx={`${el.width / 2}%`}
+          ry={`${el.height / 2}%`}
           fill={el.color || "#cccccc"}
         />
       );
@@ -128,12 +129,11 @@ function SvgElement({
 }
 
 /** Kanvas desain SVG yang bisa digunakan di flat dan 3D view */
-function DesignCanvas({ project, width, height, borderRadius = 8, isExport = false }: {
+function DesignCanvas({ project, width, height, borderRadius = 8 }: {
   project: DesignProject;
   width: number;
   height: number;
   borderRadius?: number;
-  isExport?: boolean;
 }) {
   const sorted = [...project.elements].sort((a, b) => a.zIndex - b.zIndex);
   const isSizeB = project.printSize === "Size B (17x23cm)";
@@ -172,17 +172,15 @@ function DesignCanvas({ project, width, height, borderRadius = 8, isExport = fal
         {sorted.map((el) => (
           <SvgElement key={el.id} el={el} canvasWidthPx={width} canvasHeightPx={height} />
         ))}
-        {!isExport && (
-          <image
-            href="/mika-nama.png"
-            x={isSizeB ? '11.76%' : '21.73%'}
-            y={isSizeB ? '50%' : '66.17%'}
-            width={isSizeB ? '76.47%' : '56.52%'}
-            height={isSizeB ? '19.56%' : '13.23%'}
-            preserveAspectRatio="none"
-            pointerEvents="none"
-          />
-        )}
+        <image
+          href="/mika-nama.png"
+          x={isSizeB ? '11.76%' : '21.73%'}
+          y={isSizeB ? '50%' : '66.17%'}
+          width={isSizeB ? '76.47%' : '56.52%'}
+          height={isSizeB ? '19.56%' : '13.23%'}
+          preserveAspectRatio="none"
+          pointerEvents="none"
+        />
       </svg>
     </div>
   );
@@ -365,7 +363,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
         ctx.fillStyle = el.color || "#cccccc";
         if (el.shapeType === "circle") {
           ctx.beginPath();
-          ctx.arc(drawX + drawW / 2, drawY + drawW / 2, drawW / 2, 0, Math.PI * 2);
+          ctx.ellipse(drawX + drawW / 2, drawY + drawH / 2, drawW / 2, drawH / 2, 0, 0, Math.PI * 2);
           ctx.fill();
         } else if (el.shapeType === "line") {
           ctx.strokeStyle = el.color || "#000";

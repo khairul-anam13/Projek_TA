@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Upload, X, Wand2, Download, Save } from "lucide-react";
 import { removeBackground, Config } from '@imgly/background-removal';
 import { traceDataUrl, getSVG } from '@cadit-app/potrace-ts';
@@ -19,31 +19,29 @@ export default function ImageToVectorConverter({ onInsertSVG, onClose }: Props) 
   const [errorMsg, setErrorMsg] = useState("");
   const [svgResult, setSvgResult] = useState<string | null>(null);
   const [threshold, setThreshold] = useState<number>(128);
-  const [originalFile, setOriginalFile] = useState<File | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // URL gambar hasil background-removal, disimpan supaya saat threshold
+  // diubah kita bisa memakainya lagi tanpa menjalankan ulang removeBackground
+  // (proses AI yang jauh lebih berat/lambat daripada threshold+trace).
+  const bgRemovedUrlRef = useRef<string | null>(null);
 
-  const processImage = async (file: File) => {
-    try {
-      setOriginalFile(file);
-      setStatus("loading-model");
-      
-      // 1. Remove Background
-      setStatus("removing-bg");
-      const config: Config = {
-        progress: (key: string, current: number, total: number) => {
-          // If we want detailed progress we can log here
-        }
-      };
-      const imageBlob = await removeBackground(file, config);
-      
-      setStatus("thresholding");
-      
-      // 2. Draw to Canvas and Threshold
-      const url = URL.createObjectURL(imageBlob);
-      const img = new Image();
-      img.src = url;
-      await new Promise((resolve) => { img.onload = resolve; });
+  useEffect(() => {
+    return () => {
+      if (bgRemovedUrlRef.current) URL.revokeObjectURL(bgRemovedUrlRef.current);
+    };
+  }, []);
+
+  /** Langkah threshold + crop + trace-ke-SVG dari gambar yang backgroundnya
+   * sudah dihapus. Dipisah dari processImage supaya bisa dipakai ulang saat
+   * threshold berubah tanpa mengulang removeBackground. */
+  const traceFromBgRemoved = async (imageUrl: string): Promise<string> => {
+    setStatus("thresholding");
+
+    // 2. Draw to Canvas and Threshold
+    const img = new Image();
+    img.src = imageUrl;
+    await new Promise((resolve) => { img.onload = resolve; });
 
       const canvas = canvasRef.current;
       if (!canvas) throw new Error("Canvas element missing");
@@ -130,15 +128,50 @@ export default function ImageToVectorConverter({ onInsertSVG, onClose }: Props) 
         }
       }
 
-      const paths = traceDataUrl(dataUrl, { optcurve: true, opttolerance: 0.2 });
-      const svgString = getSVG(paths, 1);
-      
-      setSvgResult(svgString);
-      setStatus("success");
-      
+    const paths = traceDataUrl(dataUrl, { optcurve: true, opttolerance: 0.2 });
+    const svgString = getSVG(paths, 1);
+
+    setSvgResult(svgString);
+    setStatus("success");
+    return svgString;
+  };
+
+  const processImage = async (file: File) => {
+    try {
+      setStatus("loading-model");
+
+      // 1. Remove Background
+      setStatus("removing-bg");
+      const config: Config = {
+        progress: (key: string, current: number, total: number) => {
+          // If we want detailed progress we can log here
+        }
+      };
+      const imageBlob = await removeBackground(file, config);
+
+      if (bgRemovedUrlRef.current) URL.revokeObjectURL(bgRemovedUrlRef.current);
+      const url = URL.createObjectURL(imageBlob);
+      bgRemovedUrlRef.current = url;
+
+      // 2-3. Threshold + vectorize
+      const svgString = await traceFromBgRemoved(url);
+
       // Save to Supabase Storage in the background
       saveToSupabase(file, svgString);
+    } catch (err: any) {
+      console.error(err);
+      setStatus("error");
+      setErrorMsg(err.message || "Failed to process image.");
+    }
+  };
 
+  /** Dipanggil saat slider threshold dilepas: background sudah dihapus
+   * sebelumnya (cache di bgRemovedUrlRef), jadi cukup jalankan ulang
+   * threshold+trace tanpa removeBackground lagi. */
+  const reTraceWithNewThreshold = async () => {
+    if (!bgRemovedUrlRef.current) return;
+    try {
+      await traceFromBgRemoved(bgRemovedUrlRef.current);
     } catch (err: any) {
       console.error(err);
       setStatus("error");
@@ -309,9 +342,7 @@ export default function ImageToVectorConverter({ onInsertSVG, onClose }: Props) 
                onChange={(e) => {
                  setThreshold(parseInt(e.target.value));
                }}
-               onMouseUp={() => {
-                 if (originalFile) processImage(originalFile);
-               }}
+               onMouseUp={reTraceWithNewThreshold}
                className="w-32 accent-brand-600"
              />
           </div>

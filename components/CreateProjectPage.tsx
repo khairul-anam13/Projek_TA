@@ -132,7 +132,15 @@ export default function CreateProjectPage({
     }
   }, []);
 
+  // Set saat handlePickCandidate mengubah namaSekolah secara terprogram —
+  // mencegah efek auto-search di bawah menembak ULANG tanpa filter kabupaten
+  // segera setelahnya, yang bisa membatalkan kandidat yang baru saja dipilih
+  // user (nama yang sama tanpa kabupaten bisa kembali ambigu / balik ke
+  // status "choices", menimpa hasil "success" yang baru didapat).
+  const skipNextAutoSearchRef = useRef(false);
+
   const handlePickCandidate = useCallback((s: SekolahSuggestion) => {
+    skipNextAutoSearchRef.current = true;
     setNamaSekolah(s.nama);
     runSearch(s.nama, s.kabupaten ?? undefined);
   }, [runSearch]);
@@ -146,6 +154,10 @@ export default function CreateProjectPage({
   useEffect(() => {
     if (!hasMountedRef.current) {
       hasMountedRef.current = true;
+      return;
+    }
+    if (skipNextAutoSearchRef.current) {
+      skipNextAutoSearchRef.current = false;
       return;
     }
     const trimmed = namaSekolah.trim();
