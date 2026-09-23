@@ -3,6 +3,8 @@ import {
   clampToCanvas,
   getCenteredX,
   applySnap,
+  elementSnapCandidates,
+  applySmartSnap,
   enforceMikaConstraint,
   getCardRatio,
   computeImageImportSize,
@@ -67,6 +69,57 @@ describe("applySnap (snap ke garis bantu 5/50/95)", () => {
   it("nilai tepat di threshold (>=1.5) tidak snap (batas eksklusif)", () => {
     const r = applySnap(50 + 1.5, 0);
     expect(r.x).toBe(51.5);
+  });
+});
+
+describe("elementSnapCandidates (titik snap dari elemen lain + grid tetap)", () => {
+  it("selalu menyertakan grid tetap (5/50/95) walau tidak ada elemen lain", () => {
+    const { x, y } = elementSnapCandidates([]);
+    expect(x).toEqual(expect.arrayContaining([5, 50, 95]));
+    expect(y).toEqual(expect.arrayContaining([5, 50, 95]));
+  });
+
+  it("menambahkan tepi kiri/tengah/kanan dan atas/tengah/bawah tiap elemen lain", () => {
+    const { x, y } = elementSnapCandidates([{ x: 10, y: 20, width: 40, height: 8 }]);
+    expect(x).toEqual(expect.arrayContaining([10, 30, 50])); // kiri, tengah, kanan
+    expect(y).toEqual(expect.arrayContaining([20, 24, 28])); // atas, tengah, bawah
+  });
+});
+
+describe("applySmartSnap (smart guide: menempel ke elemen lain, bukan cuma grid)", () => {
+  it("tepi kiri elemen yang digeser menempel ke tepi kanan elemen lain di dekatnya", () => {
+    // Elemen lain: x 10-30 (tepi kanan = 30). Elemen yang digeser lebar 15
+    // (agar tepi tengah/kanannya tidak kebetulan dekat grid tetap 5/50/95),
+    // coba taruh di x=30.6.
+    const { x: candX, y: candY } = elementSnapCandidates([{ x: 10, y: 0, width: 20, height: 10 }]);
+    const r = applySmartSnap(30.6, 0, 15, 5, candX, candY);
+    expect(r.x).toBe(30);
+    expect(r.guides).toEqual(expect.arrayContaining([{ type: "v", value: 30 }]));
+  });
+
+  it("tengah elemen yang digeser menempel ke tengah elemen lain (rata tengah horizontal)", () => {
+    // Elemen lain: x 0-40 -> tengah = 20. Elemen digeser lebar 10, taruh di x=15.6 (tengah=20.6, dekat 20).
+    const { x: candX, y: candY } = elementSnapCandidates([{ x: 0, y: 0, width: 40, height: 10 }]);
+    const r = applySmartSnap(15.6, 50, 10, 5, candX, candY);
+    expect(r.x + 5).toBeCloseTo(20, 10); // tengah elemen baru tepat di 20
+  });
+
+  it("tidak snap ke elemen lain yang jauh di luar threshold (maupun ke grid tetap)", () => {
+    // Elemen lain & posisi digeser sengaja dipilih supaya ketiga tepi
+    // (kiri/tengah/kanan) elemen yang digeser jauh dari SEMUA kandidat —
+    // baik tepi elemen lain maupun grid tetap 5/50/95.
+    const { x: candX, y: candY } = elementSnapCandidates([{ x: 10, y: 0, width: 5, height: 5 }]);
+    const r = applySmartSnap(30, 30, 10, 10, candX, candY);
+    expect(r.x).toBe(30);
+    expect(r.y).toBe(30);
+    expect(r.guides).toHaveLength(0);
+  });
+
+  it("tetap bisa snap ke grid tetap (5/50/95) seperti applySnap, bukan hanya ke elemen lain", () => {
+    const { x: candX, y: candY } = elementSnapCandidates([]);
+    const r = applySmartSnap(50.5, 4.6, 10, 10, candX, candY);
+    expect(r.x).toBe(50);
+    expect(r.y).toBe(5);
   });
 });
 

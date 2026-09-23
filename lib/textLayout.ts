@@ -270,6 +270,15 @@ export function computeFitFontSize(
     return initialFontSize;
   }
 
+  // Dipanggil dari useMemo di CanvasFitText, yang juga dieksekusi saat
+  // server-side render (prerender statis / hard refresh sebelum hydration)
+  // — Node.js tidak punya Canvas API. Kembalikan initialFontSize apa adanya;
+  // begitu ter-hydrate di browser, useMemo menghitung ulang dengan nilai
+  // shrink-to-fit yang akurat.
+  if (typeof document === "undefined") {
+    return initialFontSize;
+  }
+
   // Create (or reuse) an offscreen canvas for measurement
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");

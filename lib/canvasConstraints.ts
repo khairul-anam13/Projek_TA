@@ -61,6 +61,79 @@ export function applySnap(
   return { x, y, guides };
 }
 
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Titik snap X/Y dari elemen-elemen LAIN di kanvas (tepi kiri/tengah/kanan
+ * untuk X, atas/tengah/bawah untuk Y), digabung dengan grid tetap
+ * (SNAP_POINTS). Dipakai untuk "smart guide" ala software desain profesional
+ * (Figma/Canva/Illustrator dkk): elemen yang digeser menempel ke elemen lain
+ * di sekitarnya, bukan cuma ke grid statis.
+ */
+export function elementSnapCandidates(others: Rect[]): { x: number[]; y: number[] } {
+  const x: number[] = [...SNAP_POINTS];
+  const y: number[] = [...SNAP_POINTS];
+  for (const r of others) {
+    x.push(r.x, r.x + r.width / 2, r.x + r.width);
+    y.push(r.y, r.y + r.height / 2, r.y + r.height);
+  }
+  return { x, y };
+}
+
+/** Menyelaraskan satu sisi (tepi kiri/tengah/kanan, ATAU atas/tengah/bawah)
+ * dari elemen yang digeser terhadap kandidat garis terdekat dalam radius
+ * `threshold`. Dipakai oleh applySmartSnap untuk sumbu X dan Y secara terpisah. */
+function snapAxis(
+  pos: number,
+  size: number,
+  candidates: number[],
+  threshold: number
+): { value: number; guide: number | null } {
+  const edges = [pos, pos + size / 2, pos + size];
+  let best: { delta: number; guide: number } | null = null;
+
+  for (const edge of edges) {
+    for (const cand of candidates) {
+      const delta = cand - edge;
+      if (Math.abs(delta) < threshold && (best === null || Math.abs(delta) < Math.abs(best.delta))) {
+        best = { delta, guide: cand };
+      }
+    }
+  }
+
+  return best ? { value: pos + best.delta, guide: best.guide } : { value: pos, guide: null };
+}
+
+/**
+ * Smart alignment snap: mirip applySnap, tapi mempertimbangkan tepi KIRI,
+ * TENGAH, dan KANAN elemen yang digeser (bukan cuma titik X/Y mentahnya)
+ * terhadap seluruh kandidat garis (grid tetap + tepi/tengah elemen lain dari
+ * elementSnapCandidates). Ini yang membuat elemen bisa "menempel" rata
+ * tengah atau rata tepi ke elemen lain di kanvas, seperti software desain
+ * pada umumnya.
+ */
+export function applySmartSnap(
+  tx: number,
+  ty: number,
+  width: number,
+  height: number,
+  candidateX: number[],
+  candidateY: number[],
+  threshold: number = SNAP_THRESHOLD
+): SnapResult {
+  const xRes = snapAxis(tx, width, candidateX, threshold);
+  const yRes = snapAxis(ty, height, candidateY, threshold);
+  const guides: { type: "v" | "h"; value: number }[] = [];
+  if (xRes.guide !== null) guides.push({ type: "v", value: xRes.guide });
+  if (yRes.guide !== null) guides.push({ type: "h", value: yRes.guide });
+  return { x: xRes.value, y: yRes.value, guides };
+}
+
 /**
  * Constraint Zona Mika: elemen teks tidak boleh diletakkan pada Y 50-80
  * (area fisik jendela mika nama). Elemen didorong keluar ke tepi terdekat.

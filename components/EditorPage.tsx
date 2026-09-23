@@ -6,7 +6,8 @@ import CanvasFitText from "./CanvasFitText";
 import {
   clampToCanvas,
   getCenteredX,
-  applySnap,
+  elementSnapCandidates,
+  applySmartSnap,
   enforceMikaConstraint,
   getCardRatio,
   computeImageImportSize,
@@ -49,6 +50,8 @@ import {
   Unlock,
   Loader2,
   PanelRight,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import ImageToVectorConverter from "./ImageToVectorConverter";
 import { Button, IconButton, Card } from "@/components/ui";
@@ -88,6 +91,18 @@ const MATERIAL_COLORS = [
 
 const fieldClass =
   "bg-white border border-stone-200 rounded-lg px-2 py-1.5 text-xs text-stone-700 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
+
+// Rentang & langkah zoom — mirip software desain (Figma/Photoshop dkk):
+// zoom kontinu (bukan cuma preset 50/75/100/125/150%), lewat Ctrl+Scroll,
+// tombol +/-, atau Ctrl +/-/0.
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.1;
+const ZOOM_WHEEL_SENSITIVITY = 0.0015;
+
+function clampZoom(z: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+}
 
 function generateId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).substring(2, 9)}`;
@@ -141,6 +156,7 @@ export default function EditorPage({
   const isResizingRef = useRef(false);
   const resizeStartRef = useRef({ x: 0, y: 0, elX: 0, elY: 0, elWidth: 0, elHeight: 0, handle: "se" as ResizeHandle });
   const canvasRef = useRef<HTMLDivElement>(null);
+  const canvasAreaRef = useRef<HTMLElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Ref "cermin" berisi elements terbaru, dibaca oleh event listener window
@@ -345,15 +361,28 @@ export default function EditorPage({
     setProject((p) => { pushHistory(p.elements); return p; });
   }, [pushHistory]);
 
+  // Titik pointer mentah terbaru, ditulis setiap event mousemove tanpa
+  // langsung memicu re-render.
+  const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const dragRafIdRef = useRef<number | null>(null);
+
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (!canvasRef.current) return;
+    // Perhitungan geometri & setState dijalankan maksimal sekali per
+    // animation frame (bukan sekali per event mousemove) — mouse polling
+    // rate tinggi/trackpad bisa mengirim event jauh lebih sering daripada
+    // refresh rate layar, dan men-setState di setiap event itu membuang
+    // siklus render/reconciliation yang tidak pernah sempat terlihat,
+    // sehingga drag/resize terasa berat di elemen banyak/kanvas besar.
+    const applyLatestPointer = () => {
+      dragRafIdRef.current = null;
+      const pointer = latestPointerRef.current;
+      if (!pointer || !canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
 
       if (isResizingRef.current && selectedId) {
-        const dx = ((e.clientX - resizeStartRef.current.x) / rect.width) * 100;
-        const dy = ((e.clientY - resizeStartRef.current.y) / rect.height) * 100;
+        const dx = ((pointer.x - resizeStartRef.current.x) / rect.width) * 100;
+        const dy = ((pointer.y - resizeStartRef.current.y) / rect.height) * 100;
         const el = elementsRef.current.find((x) => x.id === selectedId);
 
         const geometry = computeResize(
@@ -382,8 +411,8 @@ export default function EditorPage({
       // efek zoom (canvas dirender pada 400*zoom px), jadi TIDAK perlu dibagi
       // zoom lagi di sini — dulu dibagi dua kali sehingga drag terasa lamban
       // saat zoom-in dan terlalu sensitif saat zoom-out.
-      const dx = ((e.clientX - dragStartRef.current.x) / rect.width) * 100;
-      const dy = ((e.clientY - dragStartRef.current.y) / rect.height) * 100;
+      const dx = ((pointer.x - dragStartRef.current.x) / rect.width) * 100;
+      const dy = ((pointer.y - dragStartRef.current.y) / rect.height) * 100;
 
       let tx = clampToCanvas(dragStartRef.current.elX + dx);
       let ty = clampToCanvas(dragStartRef.current.elY + dy);
@@ -393,7 +422,12 @@ export default function EditorPage({
         tx = getCenteredX(elTypeObj.width);
       }
 
-      const snapped = applySnap(tx, ty);
+      // Smart guide: menempel ke grid tetap (5/50/95) MAUPUN ke tepi/tengah
+      // elemen lain di kanvas — mirip software desain (Figma/Canva dkk),
+      // bukan cuma ke 3 titik grid statis seperti sebelumnya.
+      const others = elementsRef.current.filter((e) => e.id !== selectedId);
+      const { x: candX, y: candY } = elementSnapCandidates(others);
+      const snapped = applySmartSnap(tx, ty, elTypeObj?.width ?? 0, elTypeObj?.height ?? 0, candX, candY);
       tx = snapped.x;
       ty = snapped.y;
 
@@ -411,12 +445,23 @@ export default function EditorPage({
       }));
     };
 
+    const onMove = (e: MouseEvent) => {
+      latestPointerRef.current = { x: e.clientX, y: e.clientY };
+      if (dragRafIdRef.current == null) {
+        dragRafIdRef.current = requestAnimationFrame(applyLatestPointer);
+      }
+    };
+
     const onUp = () => {
       if (isDraggingRef.current || isResizingRef.current) {
         isDraggingRef.current = false;
         isResizingRef.current = false;
         setActiveGuides([]);
         commitHistory();
+      }
+      if (dragRafIdRef.current != null) {
+        cancelAnimationFrame(dragRafIdRef.current);
+        dragRafIdRef.current = null;
       }
     };
 
@@ -425,13 +470,45 @@ export default function EditorPage({
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      if (dragRafIdRef.current != null) cancelAnimationFrame(dragRafIdRef.current);
     };
   }, [selectedId, commitHistory]);
+
+  // Zoom kontinu via Ctrl/Cmd+Scroll (trackpad pinch juga terdeteksi sebagai
+  // wheel+ctrlKey oleh browser) — mirip perilaku zoom di Figma/Photoshop/
+  // Illustrator, menggantikan dropdown 5 langkah tetap. React mendaftarkan
+  // onWheel sebagai passive listener secara default sehingga
+  // e.preventDefault() di situ tidak bekerja (browser tetap zoom halaman);
+  // makanya listener-nya didaftarkan manual lewat addEventListener di sini,
+  // sama seperti pola mousemove/mouseup di atas.
+  // ponytail: zoom TIDAK dijangkar ke posisi kursor (area kanvas memakai
+  // flex justify-center, yang punya perilaku scrollLeft/overflow yang tidak
+  // konsisten antar browser saat kontennya lebih besar dari viewport) —
+  // titik tengah kanvas yang jadi acuan. Upgrade ke cursor-anchored zoom
+  // kalau dibutuhkan: ganti area kanvas ke posisi absolut + transform-origin
+  // eksplisit alih-alih mengandalkan scroll flexbox.
+  useEffect(() => {
+    const container = canvasAreaRef.current;
+    if (!container) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return; // scroll biasa tetap scroll manual
+      e.preventDefault();
+      setZoom((prevZoom) => clampZoom(prevZoom * (1 - e.deltaY * ZOOM_WHEEL_SENSITIVITY)));
+    };
+
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => container.removeEventListener("wheel", onWheel);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (document.activeElement as HTMLElement)?.tagName;
       if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+
+      if (e.ctrlKey && (e.key === "=" || e.key === "+")) { e.preventDefault(); setZoom((z) => clampZoom(z + ZOOM_STEP)); return; }
+      if (e.ctrlKey && e.key === "-") { e.preventDefault(); setZoom((z) => clampZoom(z - ZOOM_STEP)); return; }
+      if (e.ctrlKey && e.key === "0") { e.preventDefault(); setZoom(1); return; }
 
       if (e.ctrlKey && e.key === "z") { e.preventDefault(); handleUndo(); return; }
       if (e.ctrlKey && e.key === "y") { e.preventDefault(); handleRedo(); return; }
@@ -508,17 +585,25 @@ export default function EditorPage({
 
         <div className="w-px h-6 bg-stone-200 mx-1" />
 
-        <select
-          value={zoom}
-          onChange={(e) => setZoom(parseFloat(e.target.value))}
-          className={cn(fieldClass, "w-20")}
-        >
-          <option value={0.5}>50%</option>
-          <option value={0.75}>75%</option>
-          <option value={1}>100%</option>
-          <option value={1.25}>125%</option>
-          <option value={1.5}>150%</option>
-        </select>
+        {/* Kontrol zoom kontinu (bukan preset tetap) — Ctrl+Scroll untuk zoom
+            halus dijangkar ke kursor, tombol +/- untuk langkah tetap, klik
+            angka % untuk reset ke 100%. Mirip kontrol zoom di software
+            desain pada umumnya. */}
+        <div className="flex items-center gap-0.5 bg-stone-50 border border-stone-200 rounded-lg p-0.5">
+          <IconButton size="sm" onClick={() => setZoom((z) => clampZoom(z - ZOOM_STEP))} title="Perkecil (Ctrl -)">
+            <ZoomOut size={14} />
+          </IconButton>
+          <button
+            onClick={() => setZoom(1)}
+            title="Reset ke 100% (Ctrl 0)"
+            className="w-12 text-center text-xs font-bold text-stone-600 hover:text-brand-700 cursor-pointer tabular-nums"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <IconButton size="sm" onClick={() => setZoom((z) => clampZoom(z + ZOOM_STEP))} title="Perbesar (Ctrl +)">
+            <ZoomIn size={14} />
+          </IconButton>
+        </div>
 
         <IconButton
           onClick={() => setShowGrid(!showGrid)}
@@ -616,6 +701,7 @@ export default function EditorPage({
           onDrop={handleFileDrop}
           onDragOver={handleDragOver}
           id="canvas-area"
+          ref={canvasAreaRef}
         >
           {/* Canvas paper */}
           <div

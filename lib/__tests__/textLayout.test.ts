@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { scaledInitialFontSize, BASE_CANVAS_WIDTH_PX } from "../textLayout";
+import { scaledInitialFontSize, computeFitFontSize, BASE_CANVAS_WIDTH_PX } from "../textLayout";
 
 describe("scaledInitialFontSize (konsistensi ukuran teks editor vs preview vs ekspor)", () => {
   it("pada lebar kanvas dasar (400px), hasilnya sama seperti sebelum ada scaling", () => {
@@ -26,5 +26,21 @@ describe("scaledInitialFontSize (konsistensi ukuran teks editor vs preview vs ek
   it("canvasWidthPx nol/negatif tidak menghasilkan skala tak-terhingga atau NaN (fallback skala 1)", () => {
     expect(Number.isFinite(scaledInitialFontSize(20, 0))).toBe(true);
     expect(scaledInitialFontSize(20, 0)).toBeCloseTo(20 * 1.5, 5);
+  });
+});
+
+describe("computeFitFontSize aman dipanggil saat server-side render (lingkungan test ini = Node, tanpa `document`)", () => {
+  // vitest.config.ts memakai environment: "node" (bukan jsdom) justru untuk
+  // menangkap regresi ini — sebelum ada guard `typeof document === "undefined"`,
+  // pemanggilan ini akan throw persis seperti yang bikin `next build` crash
+  // saat prerender /qa-test (CanvasFitText -> computeFitFontSize dipanggil
+  // dari useMemo, yang juga jalan di server render).
+  it("mengembalikan initialFontSize apa adanya, bukan throw, saat `document` tidak ada", () => {
+    expect(() => computeFitFontSize("NAMA SEKOLAH", 300, 60, 43, "Times New Roman", "bold")).not.toThrow();
+    expect(computeFitFontSize("NAMA SEKOLAH", 300, 60, 43, "Times New Roman", "bold")).toBe(43);
+  });
+
+  it("tetap mengembalikan initialFontSize untuk teks kosong (jalur guard yang sudah ada)", () => {
+    expect(computeFitFontSize("", 300, 60, 43, "Times New Roman", "bold")).toBe(43);
   });
 });
