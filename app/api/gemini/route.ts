@@ -2,10 +2,6 @@ import Groq from "groq-sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { sanitizeLayoutElements } from "@/lib/canvasConstraints";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
 const LAYOUT_SCHEMA = {
   type: "object",
   properties: {
@@ -90,6 +86,8 @@ Each element gets its own non-overlapping vertical slot, top to bottom. Y + heig
 Provide a short "description" (in Indonesian) explaining why this layout and hierarchy works best for ${mockupType}.
 `;
 
+    // Created per request, not at module load: `next build` imports this file and has no key.
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const response = await groq.chat.completions.create({
       model: "openai/gpt-oss-20b",
       max_completion_tokens: 4096,
