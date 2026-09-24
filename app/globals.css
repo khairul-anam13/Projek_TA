@@ -3,8 +3,23 @@
 @theme {
   --font-sans: var(--font-sans), sans-serif;
   --font-mono: var(--font-mono), monospace;
-  --font-layout-space: var(--font-display-space), sans-serif;
-  --font-layout-outfit: var(--font-display-outfit), sans-serif;
+  /*
+   * Bug: kunci token ini sebelumnya "--font-layout-space"/"--font-layout-outfit"
+   * (tidak match dengan className "font-display-space"/"font-display-outfit"
+   * yang dipakai di 8 tempat lintas Login/Dashboard/History/CreateProject/
+   * AiResultPage), jadi Tailwind tidak pernah men-generate utility yang
+   * dipakai itu — heading yang seharusnya pakai Space Grotesk diam-diam
+   * jatuh ke font default. Nama di sini HARUS sama persis dengan variable
+   * next/font (lihat app/layout.tsx) supaya `var(--font-display-space)`
+   * beresolusi ke font asli, bukan cuma placeholder — ini aman (bukan
+   * referensi sirkular yang benar-benar dieksekusi) karena rule dari
+   * next/font di elemen <html> tidak berada di dalam @layer sehingga
+   * selalu menang di cascade atas deklarasi token @theme ini, persis
+   * seperti pola --font-sans/--font-mono di atas yang sudah lebih dulu
+   * berhasil dengan cara yang sama.
+   */
+  --font-display-space: var(--font-display-space), sans-serif;
+  --font-display-outfit: var(--font-display-outfit), sans-serif;
   --font-layout-serif: var(--font-serif), serif;
 
   /*
@@ -26,5 +41,21 @@
   --color-canvas: #fafaf9;
   --color-surface: #ffffff;
   --color-border-subtle: #e7e5e4;
+
+  /*
+   * Palet "print studio" — dipakai khusus oleh Dashboard/Beranda untuk
+   * identitas visual yang lebih orisinil (kertas krem hangat + tinta +
+   * aksen emas foil, diambil dari warna Embos Foil produk itu sendiri
+   * #D4AF37 di lib/canvasConstraints & EditorPage) alih-alih tema
+   * "SaaS teal" generik di atas. Tidak dipakai halaman lain — aman,
+   * tidak mengubah tampilan Login/Editor/Preview/History.
+   */
+  --color-paper: #fbf7ee;
+  --color-paper-deep: #efe6d3;
+  --color-ink: #221d15;
+  --color-ink-soft: #7a6f5d;
+  --color-foil: #a9791f;
+  --color-foil-bright: #d4af37;
+  --color-foil-tint: #f6ecd2;
 }
 
