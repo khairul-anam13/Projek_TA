@@ -366,6 +366,16 @@ export default function EditorPage({
   const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
   const dragRafIdRef = useRef<number | null>(null);
 
+  // Akumulasi deltaY wheel mentah, di-flush maksimal sekali per animation
+  // frame — pola sama seperti drag di atas. Trackpad bisa mengirim event
+  // wheel jauh lebih sering daripada refresh rate layar, dan setZoom
+  // langsung per event berarti SETIAP elemen teks di kanvas menjalankan
+  // ulang shrink-to-fit (lib/textLayout.ts) sekali per event juga —
+  // membatasi ke sekali per frame membuat zoom tetap terasa halus tanpa
+  // kerja render berlebih yang tidak pernah sempat terlihat.
+  const latestZoomDeltaRef = useRef(0);
+  const zoomRafIdRef = useRef<number | null>(null);
+
   useEffect(() => {
     // Perhitungan geometri & setState dijalankan maksimal sekali per
     // animation frame (bukan sekali per event mousemove) — mouse polling
@@ -491,14 +501,28 @@ export default function EditorPage({
     const container = canvasAreaRef.current;
     if (!container) return;
 
+    const applyLatestZoom = () => {
+      zoomRafIdRef.current = null;
+      const deltaY = latestZoomDeltaRef.current;
+      latestZoomDeltaRef.current = 0;
+      if (deltaY === 0) return;
+      setZoom((prevZoom) => clampZoom(prevZoom * (1 - deltaY * ZOOM_WHEEL_SENSITIVITY)));
+    };
+
     const onWheel = (e: WheelEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return; // scroll biasa tetap scroll manual
       e.preventDefault();
-      setZoom((prevZoom) => clampZoom(prevZoom * (1 - e.deltaY * ZOOM_WHEEL_SENSITIVITY)));
+      latestZoomDeltaRef.current += e.deltaY;
+      if (zoomRafIdRef.current == null) {
+        zoomRafIdRef.current = requestAnimationFrame(applyLatestZoom);
+      }
     };
 
     container.addEventListener("wheel", onWheel, { passive: false });
-    return () => container.removeEventListener("wheel", onWheel);
+    return () => {
+      container.removeEventListener("wheel", onWheel);
+      if (zoomRafIdRef.current != null) cancelAnimationFrame(zoomRafIdRef.current);
+    };
   }, []);
 
   useEffect(() => {

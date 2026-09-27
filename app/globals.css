@@ -63,11 +63,10 @@
   /*
    * Palet "print studio" — kertas krem hangat + tinta + aksen emas foil,
    * diambil dari warna Embos Foil produk itu sendiri (#D4AF37). Dipakai oleh
-   * Dashboard/Beranda (identitas marketing) DAN oleh Editor/Preview (chrome
-   * kerja gelap ala Figma/Illustrator — lihat --color-ink-raised/-line/
-   * --color-stage di bawah): alat desain profesional memakai chrome netral
-   * gelap supaya tidak bersaing dengan warna asli karya (kulit maroon/navy,
-   * foil emas) yang sedang diedit, alih-alih tema "SaaS teal" generik.
+   * Dashboard/Beranda (identitas marketing) DAN oleh tombol CTA Editor/Preview
+   * (Export/Print, Unduh PNG — lihat EditorPage.tsx & PreviewPage.tsx), supaya
+   * aksi "hasil akhir" itu terasa satu identitas dengan produk foil emasnya
+   * sendiri, bukan warna generik.
    */
   --color-paper: #fbf7ee;
   --color-paper-deep: #efe6d3;
@@ -76,11 +75,5 @@
   --color-foil: #a9791f;
   --color-foil-bright: #d4af37;
   --color-foil-tint: #f6ecd2;
-
-  /* Chrome gelap khusus Editor/Preview — turunan --color-ink, bukan abu-abu
-     Figma generik, supaya tetap terasa satu identitas dengan palet di atas. */
-  --color-ink-raised: #2b2419;
-  --color-ink-line: #3c3222;
-  --color-stage: #171209;
 }
 

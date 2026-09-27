@@ -142,8 +142,15 @@ function truncateWord(
 
 /**
  * Calculates the optimal font size and line layout so that all wrapped lines
- * fit within `box.height`. Starts at `initialFontSize` and shrinks by 1px
- * per iteration until text fits or `MIN_FONT_SIZE` is reached.
+ * fit within `box.height`. Starts at `initialFontSize` and shrinks in 1px
+ * steps down to `MIN_FONT_SIZE`, but finds the largest step that fits via
+ * binary search over those steps (O(log n) wrap+measure passes) instead of
+ * trying every step in order — this loop reruns on every zoom tick and every
+ * text drag/resize frame, so with a large initialFontSize (high-res export
+ * canvas, zoomed-in editor) a linear O(n) scan is the difference between
+ * smooth and janky editing. Result is identical to the old linear scan: the
+ * same largest 1px-step fontSize, since fit is monotonic in font size (never
+ * gets *harder* to fit by shrinking).
  *
  * Returns a `FitResult` ready for rendering.
  */
@@ -159,22 +166,27 @@ export function fitTextInBox(
     return { lines: [], fontSize: initialFontSize, lineHeight: initialFontSize * LINE_HEIGHT_RATIO, startY: box.y };
   }
 
-  let fontSize = Math.max(initialFontSize, MIN_FONT_SIZE);
+  const fontSize0 = Math.max(initialFontSize, MIN_FONT_SIZE);
+  const maxSteps = Math.ceil(fontSize0 - MIN_FONT_SIZE);
 
-  while (true) {
-    const lineHeight = fontSize * LINE_HEIGHT_RATIO;
+  const tryStep = (k: number) => {
+    const fontSize = fontSize0 - k;
     const lines = wrapTextToLines(ctx, text, box.width, fontSize, fontFamily, fontWeight);
-    const totalHeight = lines.length * lineHeight;
+    const fits = lines.length * fontSize * LINE_HEIGHT_RATIO <= box.height || fontSize <= MIN_FONT_SIZE;
+    return { fontSize, lines, fits };
+  };
 
-    if (totalHeight <= box.height || fontSize <= MIN_FONT_SIZE) {
-      // Vertically center the block inside the box
-      const blockHeight = lines.length * lineHeight;
-      const startY = box.y + (box.height - blockHeight) / 2 + fontSize * 0.85; // baseline offset
-      return { lines, fontSize, lineHeight, startY };
-    }
-
-    fontSize -= 1;
+  let lo = 0, hi = maxSteps;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (tryStep(mid).fits) hi = mid; else lo = mid + 1;
   }
+  const { fontSize, lines } = tryStep(lo);
+
+  const lineHeight = fontSize * LINE_HEIGHT_RATIO;
+  const blockHeight = lines.length * lineHeight;
+  const startY = box.y + (box.height - blockHeight) / 2 + fontSize * 0.85; // baseline offset
+  return { lines, fontSize, lineHeight, startY };
 }
 
 /**
@@ -288,14 +300,25 @@ export function computeFitLayout(
     return { lines: [], fontSize: initialFontSize };
   }
 
-  // Create (or reuse) an offscreen canvas for measurement
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
+  const ctx = getMeasureCtx();
   if (!ctx) return { lines: [], fontSize: initialFontSize };
 
   const box: BoundingBox = { x: 0, y: 0, width: boxWidthPx, height: boxHeightPx };
   const { lines, fontSize } = fitTextInBox(ctx, text, box, initialFontSize, fontFamily, fontWeight);
   return { lines, fontSize };
+}
+
+// Satu offscreen canvas dipakai ulang untuk semua pengukuran teks, bukan
+// document.createElement("canvas") baru di setiap panggilan — computeFitLayout
+// jalan untuk SETIAP elemen teks di SETIAP tick zoom/drag/resize, jadi
+// alokasi+GC elemen DOM baru berulang kali per frame itu sendiri terasa di
+// keresponsifan editing, terpisah dari biaya algoritma shrink-to-fit-nya.
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+function getMeasureCtx(): CanvasRenderingContext2D | null {
+  if (measureCtx === undefined) {
+    measureCtx = document.createElement("canvas").getContext("2d");
+  }
+  return measureCtx;
 }
 
 /** @deprecated gunakan computeFitLayout — dipertahankan untuk kompatibilitas test lama. */
