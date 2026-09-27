@@ -245,10 +245,20 @@ export function drawTextInBox(
 // SVG foreignObject helpers
 // ---------------------------------------------------------------------------
 
+export interface FitLayoutResult {
+  lines: string[];
+  fontSize: number;
+}
+
 /**
- * Computes CSS font-size for SVG foreignObject text boxes.
- * Uses an offscreen canvas to run the same shrink logic as drawTextInBox,
- * but returns just the final pixel size so CSS can apply it.
+ * Computes both the wrapped lines AND the font-size for SVG foreignObject
+ * text boxes, using an offscreen canvas to run the SAME shrink/wrap logic as
+ * drawTextInBox (the PDF/PNG export path). The caller (CanvasFitText) MUST
+ * render exactly these `lines` verbatim (one per row, no further browser
+ * word-wrap) — letting the browser re-wrap the raw string with its own line-
+ * breaking algorithm is what previously made editor/preview text overflow
+ * its box (and disagree with each other) whenever the browser's wrap points
+ * didn't match the ones this function/drawTextInBox assumed.
  *
  * @param text           - Text content
  * @param boxWidthPx     - Width of the element in screen pixels
@@ -256,18 +266,17 @@ export function drawTextInBox(
  * @param initialFontSize - Starting font size in pixels
  * @param fontFamily
  * @param fontWeight
- * @returns Optimal font size in pixels
  */
-export function computeFitFontSize(
+export function computeFitLayout(
   text: string | null | undefined,
   boxWidthPx: number,
   boxHeightPx: number,
   initialFontSize: number,
   fontFamily: string,
   fontWeight: string
-): number {
+): FitLayoutResult {
   if (!text || text.trim() === "" || boxWidthPx <= 0 || boxHeightPx <= 0) {
-    return initialFontSize;
+    return { lines: [], fontSize: initialFontSize };
   }
 
   // Dipanggil dari useMemo di CanvasFitText, yang juga dieksekusi saat
@@ -276,15 +285,27 @@ export function computeFitFontSize(
   // begitu ter-hydrate di browser, useMemo menghitung ulang dengan nilai
   // shrink-to-fit yang akurat.
   if (typeof document === "undefined") {
-    return initialFontSize;
+    return { lines: [], fontSize: initialFontSize };
   }
 
   // Create (or reuse) an offscreen canvas for measurement
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  if (!ctx) return initialFontSize;
+  if (!ctx) return { lines: [], fontSize: initialFontSize };
 
   const box: BoundingBox = { x: 0, y: 0, width: boxWidthPx, height: boxHeightPx };
-  const { fontSize } = fitTextInBox(ctx, text, box, initialFontSize, fontFamily, fontWeight);
-  return fontSize;
+  const { lines, fontSize } = fitTextInBox(ctx, text, box, initialFontSize, fontFamily, fontWeight);
+  return { lines, fontSize };
+}
+
+/** @deprecated gunakan computeFitLayout — dipertahankan untuk kompatibilitas test lama. */
+export function computeFitFontSize(
+  text: string | null | undefined,
+  boxWidthPx: number,
+  boxHeightPx: number,
+  initialFontSize: number,
+  fontFamily: string,
+  fontWeight: string
+): number {
+  return computeFitLayout(text, boxWidthPx, boxHeightPx, initialFontSize, fontFamily, fontWeight).fontSize;
 }

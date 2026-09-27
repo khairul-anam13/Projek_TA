@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { CanvasElement } from "@/lib/types";
-import { computeFitFontSize, scaledInitialFontSize } from "@/lib/textLayout";
+import { computeFitLayout, scaledInitialFontSize } from "@/lib/textLayout";
 
 interface CanvasFitTextProps {
   el: CanvasElement;
@@ -24,20 +24,28 @@ interface CanvasFitTextProps {
  * matching the fit logic used by the PDF/PNG export (lib/textLayout.ts) so the
  * on-screen editor/preview never shows text that the final export would have
  * shrunk or wrapped differently.
+ *
+ * Renders the exact `lines` computed by computeFitLayout (one per row) instead
+ * of a single raw text blob left to the browser's own word-wrap — the browser
+ * wraps differently at every container width (editor zoom vs. preview
+ * thumbnail vs. export canvas), which used to make text disagree between
+ * editor/preview and, when it produced more lines than the fit algorithm
+ * assumed, overflow and get clipped by the box.
  */
 export default function CanvasFitText({ el, boxWidthPx, boxHeightPx, canvasWidthPx }: CanvasFitTextProps) {
   const fontFamily = el.fontFamily || "Times New Roman";
   const fontWeight = el.fontWeight || "normal";
   const initialFontSize = scaledInitialFontSize(el.fontSize, canvasWidthPx);
 
-  const fontSize = useMemo(
-    () => computeFitFontSize(el.text, boxWidthPx, boxHeightPx, initialFontSize, fontFamily, fontWeight),
+  const { lines, fontSize } = useMemo(
+    () => computeFitLayout(el.text, boxWidthPx, boxHeightPx, initialFontSize, fontFamily, fontWeight),
     [el.text, boxWidthPx, boxHeightPx, initialFontSize, fontFamily, fontWeight]
   );
 
-  if (!el.text || el.text.trim() === "") return null;
+  if (!el.text || el.text.trim() === "" || lines.length === 0) return null;
 
-  const justifyContent = el.align === "center" ? "center" : el.align === "right" ? "flex-end" : "flex-start";
+  const align = el.align || "left";
+  const alignItems = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
 
   return (
     <foreignObject x={`${el.x}%`} y={`${el.y}%`} width={`${el.width}%`} height={`${el.height}%`}>
@@ -46,22 +54,20 @@ export default function CanvasFitText({ el, boxWidthPx, boxHeightPx, canvasWidth
           width: "100%",
           height: "100%",
           display: "flex",
-          alignItems: "center",
-          justifyContent,
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems,
           fontFamily,
           fontWeight,
           fontSize: `${fontSize}px`,
           color: el.color || "#000",
           overflow: "hidden",
-          wordBreak: "break-word",
-          overflowWrap: "anywhere",
-          textAlign: el.align || "left",
           lineHeight: 1.35,
-          padding: "2px 4px",
-          boxSizing: "border-box" as const,
         }}
       >
-        {el.text}
+        {lines.map((line, i) => (
+          <div key={i} style={{ whiteSpace: "nowrap" }}>{line}</div>
+        ))}
       </div>
     </foreignObject>
   );

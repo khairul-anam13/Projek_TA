@@ -500,12 +500,12 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
         className="h-14"
         containerClassName="max-w-none"
         right={
-          <div className="flex items-center gap-1.5 bg-stone-100 rounded-lg p-1" id="mode-toggle">
+          <div className="flex items-center gap-0.5 bg-stone-100 rounded-md p-0.5" id="mode-toggle">
             {(["3d", "flat"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`px-3 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
+                className={`px-3 py-1 rounded-sm text-xs font-medium transition cursor-pointer ${
                   mode === m
                     ? "bg-white text-stone-900 shadow-sm"
                     : "text-stone-500 hover:text-stone-700"
@@ -571,7 +571,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
             </div>
 
             {/* Print specs */}
-            <div className="p-4 bg-stone-50 rounded-xl border border-stone-200 space-y-2.5">
+            <div className="p-4 bg-stone-50 rounded-lg border border-stone-200 space-y-2.5">
               <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
                 Spesifikasi Cetak
               </h3>
@@ -635,7 +635,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
 
           {/* Download Actions */}
           <div className="p-5 border-t border-stone-100 space-y-2.5">
-            <Button variant="primary" size="lg" className="w-full" onClick={() => generateHighResFile("png")}>
+            <Button variant="primary" size="lg" className="w-full rounded-lg shadow-none bg-foil-bright text-ink hover:bg-foil active:bg-foil" onClick={() => generateHighResFile("png")}>
               <Download className="w-4 h-4" />
               <span>Unduh PNG (Resolusi Tinggi)</span>
             </Button>

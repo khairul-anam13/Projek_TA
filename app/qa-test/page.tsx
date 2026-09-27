@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import PreviewPage from "@/components/PreviewPage";
+import EditorPage from "@/components/EditorPage";
 import { getMockupTemplate } from "@/lib/mockupTemplates";
 import { drawTextInBox } from "@/lib/textLayout";
 import { DesignProject } from "@/lib/types";
@@ -22,13 +23,17 @@ const longProject: DesignProject = {
   status: "Draft",
   slogan: "",
   description: "",
+  // id per elemen di-override jadi deterministik (bukan id dari
+  // getMockupTemplate yang memakai Date.now()) — nilai objek module-level ini
+  // dievaluasi terpisah di server & di client, jadi Date.now() menghasilkan id
+  // berbeda antara HTML hasil SSR dan render client -> React hydration mismatch.
   elements: getMockupTemplate("Rapor SMA/SMK", {
     judulRapor: "Rapor Peserta Didik",
     namaSekolah: "SMKN 2 Karanganyar",
     alamatSekolah:
       "Jl. Yos Sudarso, Kayangan, Bejen, Kec. Karanganyar, Kabupaten Karanganyar, Jawa Tengah, 57716",
     subInformasi: "NPSN: 20312071 | Bentuk Pendidikan: SMK | Status: Negeri",
-  }),
+  }).map((el, i) => ({ ...el, id: `qa_el_${i}` })),
 };
 
 function ExportCanvasPreview({ project }: { project: DesignProject }) {
@@ -80,15 +85,40 @@ function ExportCanvasPreview({ project }: { project: DesignProject }) {
 }
 
 export default function QaPage() {
+  const [project] = useState(longProject);
+  // Halaman editor/preview asli selalu menunggu fetch data client-side dulu
+  // (lihat app/(app)/editor/[id]/page.tsx: layar "Memuat proyek...") sebelum
+  // me-mount EditorPage/PreviewPage, jadi elemen teksnya tidak pernah ikut
+  // ter-SSR. Harness QA ini memakai data statis yang tersedia sejak awal,
+  // jadi perlu gate manual yang sama supaya tidak keliru mem-SSR CanvasFitText
+  // (yang sengaja no-op saat SSR — lihat computeFitLayout) lalu mismatch saat
+  // hydrate.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
   return (
-    <div style={{ padding: 24, display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
-      <div>
-        <h2>Export canvas render (drawTextInBox pipeline) — long real data</h2>
-        <ExportCanvasPreview project={longProject} />
+    <div>
+      <div style={{ height: 700, borderBottom: "1px solid #ccc" }}>
+        <h2 style={{ padding: "8px 12px", margin: 0, background: "#fff" }}>EditorPage (Figma-style chrome reskin)</h2>
+        <div style={{ height: "calc(100% - 37px)" }}>
+          <EditorPage
+            project={project}
+            onBackToDashboard={() => {}}
+            onSaveProject={async (p) => ({ project: p, persisted: false })}
+            onExport={async () => {}}
+          />
+        </div>
       </div>
-      <div style={{ width: 500 }}>
-        <h2>PreviewPage (on-screen SVG) — long real data</h2>
-        <PreviewPage project={longProject} onBackToEditor={() => {}} />
+      <div style={{ padding: 24, display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div>
+          <h2>Export canvas render (drawTextInBox pipeline) — long real data</h2>
+          <ExportCanvasPreview project={longProject} />
+        </div>
+        <div style={{ width: 500 }}>
+          <h2>PreviewPage (on-screen SVG) — long real data</h2>
+          <PreviewPage project={longProject} onBackToEditor={() => {}} />
+        </div>
       </div>
     </div>
   );

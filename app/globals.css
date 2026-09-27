@@ -43,12 +43,31 @@
   --color-border-subtle: #e7e5e4;
 
   /*
-   * Palet "print studio" — dipakai khusus oleh Dashboard/Beranda untuk
-   * identitas visual yang lebih orisinil (kertas krem hangat + tinta +
-   * aksen emas foil, diambil dari warna Embos Foil produk itu sendiri
-   * #D4AF37 di lib/canvasConstraints & EditorPage) alih-alih tema
-   * "SaaS teal" generik di atas. Tidak dipakai halaman lain — aman,
-   * tidak mengubah tampilan Login/Editor/Preview/History.
+   * Aksen "accent" (biru) — dipakai KHUSUS untuk chrome interaktif Editor
+   * (outline seleksi, resize handle, smart-guide, hover panel properti):
+   * isyarat visual paling dikenali dari Figma/software desain sejenis.
+   * Terpisah dari --color-brand (teal, identitas tombol/CTA di seluruh app)
+   * supaya brand tombol tidak ikut berubah — hanya chrome kerja di kanvas.
+   */
+  --color-accent-50: #eff8ff;
+  --color-accent-100: #dbeefe;
+  --color-accent-200: #bfe1fe;
+  --color-accent-300: #93cdfd;
+  --color-accent-400: #5eb1fb;
+  --color-accent-500: #2f93f5;
+  --color-accent-600: #0d99ff;
+  --color-accent-700: #0b7dd6;
+  --color-accent-800: #0f63ab;
+  --color-accent-900: #123f6d;
+
+  /*
+   * Palet "print studio" — kertas krem hangat + tinta + aksen emas foil,
+   * diambil dari warna Embos Foil produk itu sendiri (#D4AF37). Dipakai oleh
+   * Dashboard/Beranda (identitas marketing) DAN oleh Editor/Preview (chrome
+   * kerja gelap ala Figma/Illustrator — lihat --color-ink-raised/-line/
+   * --color-stage di bawah): alat desain profesional memakai chrome netral
+   * gelap supaya tidak bersaing dengan warna asli karya (kulit maroon/navy,
+   * foil emas) yang sedang diedit, alih-alih tema "SaaS teal" generik.
    */
   --color-paper: #fbf7ee;
   --color-paper-deep: #efe6d3;
@@ -57,5 +76,11 @@
   --color-foil: #a9791f;
   --color-foil-bright: #d4af37;
   --color-foil-tint: #f6ecd2;
+
+  /* Chrome gelap khusus Editor/Preview — turunan --color-ink, bukan abu-abu
+     Figma generik, supaya tetap terasa satu identitas dengan palet di atas. */
+  --color-ink-raised: #2b2419;
+  --color-ink-line: #3c3222;
+  --color-stage: #171209;
 }
 

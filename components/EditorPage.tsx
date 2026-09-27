@@ -54,7 +54,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import ImageToVectorConverter from "./ImageToVectorConverter";
-import { Button, IconButton, Card } from "@/components/ui";
+import { Button, IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 interface EditorPageProps {
@@ -90,7 +90,7 @@ const MATERIAL_COLORS = [
 ];
 
 const fieldClass =
-  "bg-white border border-stone-200 rounded-lg px-2 py-1.5 text-xs text-stone-700 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
+  "bg-white border border-stone-200 rounded-sm px-2 py-1.5 text-xs text-stone-700 outline-none transition focus:border-accent-500 focus:ring-1 focus:ring-accent-100";
 
 // Rentang & langkah zoom — mirip software desain (Figma/Photoshop dkk):
 // zoom kontinu (bukan cuma preset 50/75/100/125/150%), lewat Ctrl+Scroll,
@@ -542,18 +542,19 @@ export default function EditorPage({
   const canvasH = Math.round(canvasW / ratio);
 
   return (
-    <div className="h-screen bg-canvas flex flex-col overflow-hidden font-sans text-[13px] text-stone-800 select-none">
+    <div className="h-screen bg-white flex flex-col overflow-hidden font-sans text-[13px] text-stone-800 select-none">
 
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-stone-900 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-lg pointer-events-none">
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-ink text-stone-50 px-4 py-2 rounded-md text-xs font-semibold shadow-lg pointer-events-none">
           {toastMsg}
         </div>
       )}
 
       {/* ─── TOP BAR ──────────────────────────────────────────────────── */}
-      <header className="h-14 bg-white border-b border-stone-200 flex items-center px-3 gap-1.5 shrink-0 z-30 overflow-x-auto overflow-y-hidden">
+      <header className="h-11 bg-white border-b border-stone-200 flex items-center px-2 gap-1 shrink-0 z-30 overflow-x-auto overflow-y-hidden">
         <IconButton
+          size="sm"
           onClick={async () => {
             // Kalau ada save yang masih berjalan, tunggu dulu supaya tidak
             // pindah halaman sebelum perubahan terakhir benar-benar tersimpan.
@@ -562,72 +563,75 @@ export default function EditorPage({
           }}
           title="Kembali ke Dashboard"
         >
-          <ChevronLeft size={18} />
+          <ChevronLeft size={16} />
         </IconButton>
 
         <div className="flex items-center gap-2 min-w-0 mr-1 pl-1">
-          <div className="w-7 h-7 rounded-lg overflow-hidden shadow-sm shrink-0">
+          <div className="w-5 h-5 rounded overflow-hidden shrink-0">
             <img src="/pagefree.png" alt="Page Free" className="w-full h-full object-cover bg-white" />
           </div>
-          <span className="text-sm font-bold text-stone-800 truncate max-w-[180px]" title={project.name}>
+          <span className="text-[12px] font-semibold text-stone-700 truncate max-w-[160px]" title={project.name}>
             {project.name}
           </span>
         </div>
 
-        <div className="w-px h-6 bg-stone-200 mx-1" />
+        <div className="w-px h-5 bg-stone-200 mx-1" />
 
-        <IconButton onClick={handleUndo} disabled={historyIndex === 0} title="Undo (Ctrl+Z)">
-          <Undo size={16} />
+        <IconButton size="sm" onClick={handleUndo} disabled={historyIndex === 0} title="Undo (Ctrl+Z)">
+          <Undo size={15} />
         </IconButton>
-        <IconButton onClick={handleRedo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)">
-          <Redo size={16} />
+        <IconButton size="sm" onClick={handleRedo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)">
+          <Redo size={15} />
         </IconButton>
 
-        <div className="w-px h-6 bg-stone-200 mx-1" />
+        <div className="w-px h-5 bg-stone-200 mx-1" />
 
         {/* Kontrol zoom kontinu (bukan preset tetap) — Ctrl+Scroll untuk zoom
             halus dijangkar ke kursor, tombol +/- untuk langkah tetap, klik
             angka % untuk reset ke 100%. Mirip kontrol zoom di software
             desain pada umumnya. */}
-        <div className="flex items-center gap-0.5 bg-stone-50 border border-stone-200 rounded-lg p-0.5">
+        <div className="flex items-center gap-0.5 bg-stone-50 border border-stone-200 rounded-md p-0.5">
           <IconButton size="sm" onClick={() => setZoom((z) => clampZoom(z - ZOOM_STEP))} title="Perkecil (Ctrl -)">
-            <ZoomOut size={14} />
+            <ZoomOut size={13} />
           </IconButton>
           <button
             onClick={() => setZoom(1)}
             title="Reset ke 100% (Ctrl 0)"
-            className="w-12 text-center text-xs font-bold text-stone-600 hover:text-brand-700 cursor-pointer tabular-nums"
+            className="w-11 text-center text-[11px] font-mono text-stone-500 hover:text-accent-600 cursor-pointer tabular-nums"
           >
             {Math.round(zoom * 100)}%
           </button>
           <IconButton size="sm" onClick={() => setZoom((z) => clampZoom(z + ZOOM_STEP))} title="Perbesar (Ctrl +)">
-            <ZoomIn size={14} />
+            <ZoomIn size={13} />
           </IconButton>
         </div>
 
         <IconButton
+          size="sm"
           onClick={() => setShowGrid(!showGrid)}
-          variant={showGrid ? "active" : "default"}
+          className={showGrid ? "bg-accent-50 text-accent-600" : undefined}
           title="Snap to Grid"
         >
-          <Grid size={16} />
+          <Grid size={15} />
         </IconButton>
 
         <div className="flex-1" />
 
         <IconButton
+          size="sm"
           onClick={() => setShowPropertiesPanel((v) => !v)}
           variant={showPropertiesPanel ? "active" : "default"}
           title="Panel Properti"
           className="lg:hidden"
         >
-          <PanelRight size={16} />
+          <PanelRight size={15} />
         </IconButton>
 
         <Button
           variant="secondary"
           size="sm"
           disabled={isSaving}
+          className="rounded-md shadow-none"
           onClick={() => {
             const savePromise = (async () => {
               setIsSaving(true);
@@ -653,6 +657,7 @@ export default function EditorPage({
           variant="primary"
           size="sm"
           disabled={isExporting}
+          className="rounded-md shadow-none bg-foil-bright text-ink hover:bg-foil active:bg-foil"
           onClick={async () => {
             setIsExporting(true);
             try {
@@ -672,31 +677,35 @@ export default function EditorPage({
       <div className="flex flex-1 overflow-hidden">
 
         {/* ─── LEFT ICON RAIL ─────────────────────────────────────────── */}
-        <div className="w-14 bg-white border-r border-stone-200 flex flex-col items-center py-3 gap-1.5 shrink-0">
-          <IconButton variant={!selectedId ? "active" : "default"} title="Pick Tool">
-            <MousePointer2 size={18} />
+        <div className="w-11 bg-white border-r border-stone-200 flex flex-col items-center py-2 gap-0.5 shrink-0">
+          <IconButton
+            size="sm"
+            className={!selectedId ? "bg-accent-50 text-accent-600" : undefined}
+            title="Pick Tool"
+          >
+            <MousePointer2 size={16} />
           </IconButton>
-          <div className="w-6 h-px bg-stone-200 my-1" />
-          <IconButton onClick={() => { addElement('shape', { shapeType: 'rectangle' }); setActiveDocker('properties'); }} title="Rectangle Tool (F6)">
-            <Square size={18} />
+          <div className="w-5 h-px bg-stone-200 my-1" />
+          <IconButton size="sm" onClick={() => { addElement('shape', { shapeType: 'rectangle' }); setActiveDocker('properties'); }} title="Rectangle Tool (F6)">
+            <Square size={16} />
           </IconButton>
-          <IconButton onClick={() => { addElement('shape', { shapeType: 'circle' }); setActiveDocker('properties'); }} title="Ellipse Tool (F7)">
-            <Circle size={18} />
+          <IconButton size="sm" onClick={() => { addElement('shape', { shapeType: 'circle' }); setActiveDocker('properties'); }} title="Ellipse Tool (F7)">
+            <Circle size={16} />
           </IconButton>
-          <IconButton onClick={() => setActiveDocker('elements')} title="Text Tool (Open presets)">
-            <TypeIcon size={18} />
+          <IconButton size="sm" onClick={() => setActiveDocker('elements')} title="Text Tool (Open presets)">
+            <TypeIcon size={16} />
           </IconButton>
-          <IconButton onClick={() => { addElement('shape', { shapeType: 'line', width: 40, height: 1 }); setActiveDocker('properties'); }} title="Freehand Tool">
-            <Minus size={18} />
+          <IconButton size="sm" onClick={() => { addElement('shape', { shapeType: 'line', width: 40, height: 1 }); setActiveDocker('properties'); }} title="Freehand Tool">
+            <Minus size={16} />
           </IconButton>
-          <IconButton onClick={() => setActiveDocker('elements')} title="Stamp & Icons Tool">
-            <Sparkles size={18} />
+          <IconButton size="sm" onClick={() => setActiveDocker('elements')} title="Stamp & Icons Tool">
+            <Sparkles size={16} />
           </IconButton>
         </div>
 
         {/* ─── CANVAS ─────────────────────────────────────────────────── */}
         <section
-          className="flex-grow min-w-0 bg-stone-100 overflow-auto flex items-center justify-center p-10 relative"
+          className="flex-grow min-w-0 bg-stone-200 overflow-auto flex items-center justify-center p-10 relative"
           onClick={() => setSelectedId(null)}
           onDrop={handleFileDrop}
           onDragOver={handleDragOver}
@@ -705,7 +714,7 @@ export default function EditorPage({
         >
           {/* Canvas paper */}
           <div
-            className="bg-white shadow-2xl rounded-lg relative transition-all duration-300"
+            className="bg-white shadow-[0_1px_2px_rgba(0,0,0,0.08),0_8px_24px_rgba(0,0,0,0.12)] rounded-sm relative transition-all duration-300"
             style={{
               width: `${canvasW}px`,
               height: `${canvasH}px`,
@@ -792,7 +801,7 @@ export default function EditorPage({
                         <rect
                           x={`${el.x}%`} y={`${el.y}%`}
                           width={`${el.width}%`} height={`${el.height}%`}
-                          fill="none" stroke="#0d9488" strokeWidth="1.5" strokeDasharray="4 3"
+                          fill="none" stroke="#0d99ff" strokeWidth="1"
                         />
                         {/* 8 Anchor points (resize handles) */}
                         {([
@@ -808,8 +817,8 @@ export default function EditorPage({
                           <rect
                             key={handle}
                             x={`${cx}%`} y={`${cy}%`}
-                            width="7" height="7" rx="1.5" transform="translate(-3.5, -3.5)"
-                            fill="#0d9488" stroke="#fff" strokeWidth="1"
+                            width="7" height="7" rx="1" transform="translate(-3.5, -3.5)"
+                            fill="#fff" stroke="#0d99ff" strokeWidth="1.5"
                             style={{ cursor: RESIZE_CURSORS[handle] }}
                             onMouseDown={(e) => handleResizeMouseDown(e, el.id, handle)}
                           />
@@ -823,8 +832,8 @@ export default function EditorPage({
               {/* Snap guides */}
               {activeGuides.map((g, i) => (
                 g.type === "v"
-                  ? <line key={i} x1={`${g.value}%`} y1="0%" x2={`${g.value}%`} y2="100%" stroke="#0d9488" strokeWidth="0.75" strokeDasharray="4 4" />
-                  : <line key={i} x1="0%" y1={`${g.value}%`} x2="100%" y2={`${g.value}%`} stroke="#0d9488" strokeWidth="0.75" strokeDasharray="4 4" />
+                  ? <line key={i} x1={`${g.value}%`} y1="0%" x2={`${g.value}%`} y2="100%" stroke="#ff4fd8" strokeWidth="1" />
+                  : <line key={i} x1="0%" y1={`${g.value}%`} x2="100%" y2={`${g.value}%`} stroke="#ff4fd8" strokeWidth="1" />
               ))}
 
               {/* Mika Nama Overlay */}
@@ -852,14 +861,14 @@ export default function EditorPage({
         {/* ─── RIGHT PANEL ────────────────────────────────────────────── */}
         <div
           className={cn(
-            "w-80 max-w-[85vw] bg-white border-l border-stone-200 flex flex-col shrink-0",
+            "w-72 max-w-[85vw] bg-white border-l border-stone-200 flex flex-col shrink-0",
             "fixed inset-y-0 right-0 z-50 transition-transform duration-200 ease-out",
             showPropertiesPanel ? "translate-x-0" : "translate-x-full",
             "lg:static lg:inset-auto lg:translate-x-0 lg:z-auto lg:transition-none"
           )}
         >
           {/* TABS */}
-          <div className="flex gap-1 p-2 border-b border-stone-200">
+          <div className="flex border-b border-stone-200">
             {([
               { key: "properties", label: "Properties" },
               { key: "elements", label: "Insert" },
@@ -868,10 +877,10 @@ export default function EditorPage({
                 key={tab.key}
                 onClick={() => setActiveDocker(tab.key)}
                 className={cn(
-                  "flex-1 py-2 rounded-lg text-xs font-bold transition cursor-pointer",
+                  "flex-1 py-2.5 text-[12px] font-medium transition cursor-pointer border-b-2 -mb-px",
                   activeDocker === tab.key
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-stone-400 hover:bg-stone-50 hover:text-stone-600"
+                    ? "border-accent-600 text-stone-800"
+                    : "border-transparent text-stone-400 hover:text-stone-600"
                 )}
               >
                 {tab.label}
@@ -879,20 +888,20 @@ export default function EditorPage({
             ))}
           </div>
 
-          <div className="flex-1 p-3 overflow-y-auto space-y-3">
+          <div className="flex-1 px-3 overflow-y-auto divide-y divide-stone-200">
             {/* TAB CONTENT: Properties */}
             {activeDocker === "properties" && (
-              <div className="space-y-3">
+              <>
                 {/* PROJECT MOCKUP SETTINGS (WHEN NOTHING SELECTED) */}
                 {!selectedEl && (
-                  <Card className="p-3">
-                    <p className="font-bold text-stone-700 mb-3 flex items-center gap-1.5 text-xs uppercase tracking-wide">
-                      <Layers size={14}/> Mockup & Bahan
+                  <div className="py-3">
+                    <p className="font-semibold text-stone-500 mb-3 flex items-center gap-1.5 text-[11px]">
+                      <Layers size={13}/> Mockup & bahan
                     </p>
 
                     <div className="space-y-3">
                       <div>
-                        <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Ukuran Cetak</label>
+                        <label className="text-[10px] font-medium text-stone-400 mb-1 block">Ukuran cetak</label>
                         <select
                           className={cn(fieldClass, "w-full")}
                           value={project.printSize || "Size A (23x34cm)"}
@@ -904,7 +913,7 @@ export default function EditorPage({
                       </div>
 
                       <div>
-                        <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Metode Cetak</label>
+                        <label className="text-[10px] font-medium text-stone-400 mb-1 block">Metode cetak</label>
                         <select
                           className={cn(fieldClass, "w-full")}
                           value={project.printMethod || "Embos Foil"}
@@ -921,16 +930,16 @@ export default function EditorPage({
                       </div>
 
                       <div>
-                        <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Warna Dasar Bahan (ASE/Kulit)</label>
+                        <label className="text-[10px] font-medium text-stone-400 mb-1 block">Warna dasar bahan (ASE/Kulit)</label>
                         <div className="grid grid-cols-6 gap-1.5">
                           {MATERIAL_COLORS.map(c => (
                             <div
                               key={c.hex}
                               onClick={() => setProject({...project, materialColor: c.hex})}
                               className={cn(
-                                "w-full aspect-square rounded-md cursor-pointer border-2",
+                                "w-full aspect-square rounded-sm cursor-pointer border-2",
                                 project.materialColor === c.hex || (!project.materialColor && project.backgroundColor === c.hex)
-                                  ? "border-brand-500 shadow-sm"
+                                  ? "border-accent-600"
                                   : "border-stone-200"
                               )}
                               style={{backgroundColor: c.hex}}
@@ -940,76 +949,76 @@ export default function EditorPage({
                         </div>
                       </div>
                     </div>
-                  </Card>
+                  </div>
                 )}
 
                 {/* ELEMENT PROPERTIES (WHEN SELECTED) */}
                 {selectedEl && (
-                  <div className="space-y-3">
+                  <>
                     {/* Object actions: layer, duplicate, delete */}
-                    <Card className="p-3 flex items-center justify-between gap-1">
+                    <div className="py-3 flex items-center justify-between gap-1">
                       <IconButton size="sm" onClick={() => changeLayer('front')} title="To Front"><BringToFront size={14}/></IconButton>
                       <IconButton size="sm" onClick={() => changeLayer('back')} title="To Back"><SendToBack size={14}/></IconButton>
                       <div className="w-px h-5 bg-stone-200" />
                       <IconButton size="sm" onClick={duplicateSelected} title="Duplicate (Ctrl+D)"><Copy size={14}/></IconButton>
                       <IconButton size="sm" variant="destructive" onClick={deleteSelected} title="Delete"><Trash2 size={14}/></IconButton>
-                    </Card>
+                    </div>
 
                     {/* Position & Size + Align */}
-                    <Card className="p-3">
-                      <p className="font-bold text-stone-700 mb-2 text-xs uppercase tracking-wide">Posisi & Ukuran</p>
+                    <div className="py-3">
+                      <p className="font-semibold text-stone-500 mb-2 text-[11px]">Posisi & ukuran</p>
                       <div className="grid grid-cols-2 gap-2 mb-2">
                         <div>
-                          <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">X</label>
+                          <label className="text-[10px] font-medium text-stone-400 mb-1 block">X</label>
                           <input type="number" value={selectedEl.x} onChange={(e) => updateNumericField(selectedEl.id, "x", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Y</label>
+                          <label className="text-[10px] font-medium text-stone-400 mb-1 block">Y</label>
                           <input type="number" value={selectedEl.y} onChange={(e) => updateNumericField(selectedEl.id, "y", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Lebar</label>
+                          <label className="text-[10px] font-medium text-stone-400 mb-1 block">Lebar</label>
                           <input type="number" value={selectedEl.width} onChange={(e) => updateNumericField(selectedEl.id, "width", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                         </div>
                         {selectedEl.type !== 'text' && (
                           <div>
-                            <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Tinggi</label>
+                            <label className="text-[10px] font-medium text-stone-400 mb-1 block">Tinggi</label>
                             <input type="number" value={selectedEl.height} onChange={(e) => updateNumericField(selectedEl.id, "height", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                           </div>
                         )}
                       </div>
                       <div className="grid grid-cols-4 gap-1">
-                        <button onClick={() => alignSelected('centerX')} className="px-1 py-1 text-[9px] font-bold rounded-md border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 cursor-pointer">Tgh X</button>
-                        <button onClick={() => alignSelected('centerY')} className="px-1 py-1 text-[9px] font-bold rounded-md border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 cursor-pointer">Tgh Y</button>
-                        <button onClick={() => alignSelected('left')} className="px-1 py-1 text-[9px] font-bold rounded-md border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 cursor-pointer">Kiri</button>
-                        <button onClick={() => alignSelected('right')} className="px-1 py-1 text-[9px] font-bold rounded-md border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 cursor-pointer">Kanan</button>
+                        <button onClick={() => alignSelected('centerX')} className="px-1 py-1 text-[10px] font-medium rounded-sm border border-stone-200 text-stone-500 hover:border-accent-300 hover:text-accent-700 cursor-pointer">Tgh X</button>
+                        <button onClick={() => alignSelected('centerY')} className="px-1 py-1 text-[10px] font-medium rounded-sm border border-stone-200 text-stone-500 hover:border-accent-300 hover:text-accent-700 cursor-pointer">Tgh Y</button>
+                        <button onClick={() => alignSelected('left')} className="px-1 py-1 text-[10px] font-medium rounded-sm border border-stone-200 text-stone-500 hover:border-accent-300 hover:text-accent-700 cursor-pointer">Kiri</button>
+                        <button onClick={() => alignSelected('right')} className="px-1 py-1 text-[10px] font-medium rounded-sm border border-stone-200 text-stone-500 hover:border-accent-300 hover:text-accent-700 cursor-pointer">Kanan</button>
                       </div>
-                    </Card>
+                    </div>
 
                     {/* Lock X */}
-                    <Card className="p-3 flex justify-between items-center">
-                      <span className="font-semibold text-stone-600 text-xs flex items-center gap-1.5" title="Kunci elemen agar selalu di tengah secara mendatar">
-                        {selectedEl.isLockedX ? <Lock size={14} className="text-brand-600"/> : <Unlock size={14} className="text-amber-600"/>}
-                        Kunci Sumbu X
+                    <div className="py-3 flex justify-between items-center">
+                      <span className="font-medium text-stone-600 text-[12px] flex items-center gap-1.5" title="Kunci elemen agar selalu di tengah secara mendatar">
+                        {selectedEl.isLockedX ? <Lock size={13} className="text-brand-600"/> : <Unlock size={13} className="text-amber-600"/>}
+                        Kunci sumbu X
                       </span>
                       <button
                         onClick={() => commitUpdate(selectedId!, { isLockedX: !selectedEl.isLockedX })}
                         className={cn(
-                          "px-2.5 py-1.5 text-[10px] font-bold rounded-lg shadow-sm border transition cursor-pointer",
+                          "px-2.5 py-1 text-[10px] font-medium rounded-sm border transition cursor-pointer",
                           selectedEl.isLockedX
                             ? "bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100"
                             : "bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100"
                         )}
                       >
-                        {selectedEl.isLockedX ? "Buka Gembok" : "Kunci Tengah"}
+                        {selectedEl.isLockedX ? "Buka gembok" : "Kunci tengah"}
                       </button>
-                    </Card>
+                    </div>
 
                     {/* Typography for text */}
                     {selectedEl.type === "text" && (
-                      <Card className="p-3">
-                        <p className="font-bold text-stone-700 mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wide">
-                          <TypeIcon size={14}/> Tipografi
+                      <div className="py-3">
+                        <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]">
+                          <TypeIcon size={13}/> Tipografi
                         </p>
                         <div className="space-y-2">
                           <select
@@ -1032,11 +1041,11 @@ export default function EditorPage({
                           />
 
                           <div>
-                            <label className="text-[10px] font-bold text-stone-400 uppercase mb-1 block">Ukuran Font</label>
+                            <label className="text-[10px] font-medium text-stone-400 mb-1 block">Ukuran font</label>
                             <input
                               type="number"
                               list="font-sizes"
-                              className={cn(fieldClass, "w-full")}
+                              className={cn(fieldClass, "w-full font-mono")}
                               value={selectedEl.fontSize || 14}
                               onChange={(e) => updateNumericField(selectedId!, "fontSize", e.target.value)}
                               onBlur={commitHistory}
@@ -1052,74 +1061,74 @@ export default function EditorPage({
                           <div className="flex items-center gap-1">
                             <IconButton
                               size="sm"
-                              variant={selectedEl.fontWeight === 'bold' ? 'active' : 'default'}
+                              className={selectedEl.fontWeight === 'bold' ? "bg-accent-50 text-accent-600" : undefined}
                               onClick={() => commitUpdate(selectedId!, {fontWeight: selectedEl.fontWeight === 'bold' ? 'normal' : 'bold'})}
                             >
                               <Bold size={14}/>
                             </IconButton>
                             <div className="w-px h-5 bg-stone-200 mx-0.5" />
-                            <IconButton size="sm" variant={selectedEl.align === 'left' || !selectedEl.align ? 'active' : 'default'} onClick={() => commitUpdate(selectedId!, { align: "left" })}><AlignLeft size={14}/></IconButton>
-                            <IconButton size="sm" variant={selectedEl.align === 'center' ? 'active' : 'default'} onClick={() => commitUpdate(selectedId!, { align: "center" })}><AlignCenter size={14}/></IconButton>
-                            <IconButton size="sm" variant={selectedEl.align === 'right' ? 'active' : 'default'} onClick={() => commitUpdate(selectedId!, { align: "right" })}><AlignRight size={14}/></IconButton>
+                            <IconButton size="sm" className={(selectedEl.align === 'left' || !selectedEl.align) ? "bg-accent-50 text-accent-600" : undefined} onClick={() => commitUpdate(selectedId!, { align: "left" })}><AlignLeft size={14}/></IconButton>
+                            <IconButton size="sm" className={selectedEl.align === 'center' ? "bg-accent-50 text-accent-600" : undefined} onClick={() => commitUpdate(selectedId!, { align: "center" })}><AlignCenter size={14}/></IconButton>
+                            <IconButton size="sm" className={selectedEl.align === 'right' ? "bg-accent-50 text-accent-600" : undefined} onClick={() => commitUpdate(selectedId!, { align: "right" })}><AlignRight size={14}/></IconButton>
                           </div>
                         </div>
-                      </Card>
+                      </div>
                     )}
 
                     {/* Mockup Colors Constraints */}
-                    <Card className="p-3">
-                      <p className="font-bold text-stone-700 mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wide">
-                        <Palette size={14}/> Warna ({project.printMethod || "Embos Foil"})
+                    <div className="py-3">
+                      <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]">
+                        <Palette size={13}/> Warna ({project.printMethod || "Embos Foil"})
                       </p>
                       <div className="flex gap-2">
                         {(project.printMethod || "Embos Foil") === "Embos Foil" ? (
-                          <div className="w-8 h-8 rounded-lg border-2 border-amber-500 flex items-center justify-center font-bold text-[9px] text-white shadow-sm" style={{background: "linear-gradient(135deg, #FFD700, #DAA520)"}} title="Emas Foil">Emas</div>
+                          <div className="w-8 h-8 rounded-md border-2 border-amber-500 flex items-center justify-center font-bold text-[9px] text-white" style={{background: "linear-gradient(135deg, #FFD700, #DAA520)"}} title="Emas Foil">Emas</div>
                         ) : (
                           <>
-                            <div onClick={() => commitUpdate(selectedId!, { color: "#FFFFFF" })} className={cn("w-8 h-8 rounded-lg border-2 cursor-pointer", selectedEl.color === "#FFFFFF" ? "border-brand-500 shadow-sm" : "border-stone-300")} style={{backgroundColor: "#FFFFFF"}} title="Putih"></div>
-                            <div onClick={() => commitUpdate(selectedId!, { color: "#111111" })} className={cn("w-8 h-8 rounded-lg border-2 cursor-pointer", selectedEl.color === "#111111" ? "border-brand-500 shadow-sm" : "border-stone-300")} style={{backgroundColor: "#111111"}} title="Hitam"></div>
+                            <div onClick={() => commitUpdate(selectedId!, { color: "#FFFFFF" })} className={cn("w-8 h-8 rounded-md border-2 cursor-pointer", selectedEl.color === "#FFFFFF" ? "border-accent-600" : "border-stone-300")} style={{backgroundColor: "#FFFFFF"}} title="Putih"></div>
+                            <div onClick={() => commitUpdate(selectedId!, { color: "#111111" })} className={cn("w-8 h-8 rounded-md border-2 cursor-pointer", selectedEl.color === "#111111" ? "border-accent-600" : "border-stone-300")} style={{backgroundColor: "#111111"}} title="Hitam"></div>
                           </>
                         )}
                       </div>
                       <p className="text-[10px] text-stone-400 mt-2">Warna disesuaikan otomatis dengan metode cetak yang Anda pilih pada setelan proyek.</p>
-                    </Card>
-                  </div>
+                    </div>
+                  </>
                 )}
-              </div>
+              </>
             )}
 
             {/* DOCKER: INSERT ELEMENTS */}
             {activeDocker === 'elements' && (
-              <div className="space-y-3">
-                <Card className="p-3">
-                  <p className="font-bold text-stone-700 mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wide"><TypeIcon size={14}/> Text Presets</p>
-                  <div className="space-y-1.5">
-                    <button onClick={() => addElement('text', {text: 'NAMA SEKOLAH', fontSize: 43, fontWeight: 'bold', width: 80, align: 'center'})} className="w-full text-left px-2.5 py-2 bg-stone-50 border border-stone-200 hover:border-brand-300 hover:bg-brand-50/50 rounded-lg transition cursor-pointer">
+              <>
+                <div className="py-3">
+                  <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]"><TypeIcon size={13}/> Text presets</p>
+                  <div className="space-y-1">
+                    <button onClick={() => addElement('text', {text: 'NAMA SEKOLAH', fontSize: 43, fontWeight: 'bold', width: 80, align: 'center'})} className="w-full text-left px-2.5 py-2 border border-transparent hover:border-accent-200 hover:bg-accent-50/60 rounded-sm transition cursor-pointer">
                       <span className="font-bold text-[13px]">Teks Judul Besar</span>
                     </button>
-                    <button onClick={() => addElement('text', {text: 'Tahun Pelajaran', fontSize: 33, fontWeight: 'medium', width: 80, align: 'center'})} className="w-full text-left px-2.5 py-2 bg-stone-50 border border-stone-200 hover:border-brand-300 hover:bg-brand-50/50 rounded-lg transition cursor-pointer">
+                    <button onClick={() => addElement('text', {text: 'Tahun Pelajaran', fontSize: 33, fontWeight: 'medium', width: 80, align: 'center'})} className="w-full text-left px-2.5 py-2 border border-transparent hover:border-accent-200 hover:bg-accent-50/60 rounded-sm transition cursor-pointer">
                       <span className="text-[12px]">Teks Subjudul</span>
                     </button>
-                    <button onClick={() => addElement('text', {text: 'Alamat Sekolah', fontSize: 23, width: 80, align: 'center'})} className="w-full text-left px-2.5 py-2 bg-stone-50 border border-stone-200 hover:border-brand-300 hover:bg-brand-50/50 rounded-lg transition cursor-pointer">
+                    <button onClick={() => addElement('text', {text: 'Alamat Sekolah', fontSize: 23, width: 80, align: 'center'})} className="w-full text-left px-2.5 py-2 border border-transparent hover:border-accent-200 hover:bg-accent-50/60 rounded-sm transition cursor-pointer">
                       <span className="text-[11px]">Teks Sedang</span>
                     </button>
-                    <button onClick={() => addElement('text', {text: 'NISN: 000', fontSize: 13, width: 80, align: 'center'})} className="w-full text-left px-2.5 py-2 bg-stone-50 border border-stone-200 hover:border-brand-300 hover:bg-brand-50/50 rounded-lg transition cursor-pointer">
+                    <button onClick={() => addElement('text', {text: 'NISN: 000', fontSize: 13, width: 80, align: 'center'})} className="w-full text-left px-2.5 py-2 border border-transparent hover:border-accent-200 hover:bg-accent-50/60 rounded-sm transition cursor-pointer">
                       <span className="text-[10px]">Teks Keterangan</span>
                     </button>
                   </div>
-                </Card>
+                </div>
 
-                <Card className="p-3">
-                  <p className="font-bold text-stone-700 mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wide"><ImageIcon size={14}/> Gambar & Vector</p>
+                <div className="py-3">
+                  <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]"><ImageIcon size={13}/> Gambar & vector</p>
 
                   <div className="space-y-1.5">
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="w-full"
+                      className="w-full rounded-md shadow-none"
                       onClick={() => imageInputRef.current?.click()}
                     >
-                      <Download size={14} className="text-brand-600" />
+                      <Download size={14} className="text-accent-600" />
                       <span>Import Gambar Biasa</span>
                     </Button>
                     <input
@@ -1138,18 +1147,18 @@ export default function EditorPage({
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="w-full"
+                      className="w-full rounded-md shadow-none"
                       onClick={() => setShowVectorConverter(true)}
                     >
-                      <Wand2 size={14} className="text-brand-600" />
+                      <Wand2 size={14} className="text-accent-600" />
                       <span>Tracing ke Vector (B&W)</span>
                     </Button>
                   </div>
                   <p className="text-[10px] text-stone-400 mt-2 leading-tight text-center">Tips: Anda juga bisa Drag & Drop file langsung ke kanvas.</p>
-                </Card>
+                </div>
 
-                <Card className="p-3">
-                  <p className="font-bold text-stone-700 mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wide"><Sparkles size={14}/> Stamps & Icons</p>
+                <div className="py-3">
+                  <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]"><Sparkles size={13}/> Stamps & icons</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
                       { icon: "mortarboard", label: "Toga" },
@@ -1158,14 +1167,14 @@ export default function EditorPage({
                       { icon: "leaf", label: "Daun" },
                       { icon: "building", label: "Gedung" },
                     ].map(s => (
-                      <button key={s.icon} onClick={() => addElement('logo', {logoIcon: s.icon, width: 15, height: 15})} className="flex flex-col items-center p-2.5 bg-stone-50 border border-stone-200 hover:border-brand-300 hover:bg-brand-50/50 rounded-lg transition cursor-pointer">
+                      <button key={s.icon} onClick={() => addElement('logo', {logoIcon: s.icon, width: 15, height: 15})} className="flex flex-col items-center p-2.5 border border-stone-200 hover:border-accent-300 hover:bg-accent-50/60 rounded-sm transition cursor-pointer">
                         <svg className="w-6 h-6 fill-current text-stone-600 mb-1" viewBox="0 0 100 100">{renderLogoSvg(s.icon, "currentColor")}</svg>
                         <span className="text-[10px] text-stone-500">{s.label}</span>
                       </button>
                     ))}
                   </div>
-                </Card>
-              </div>
+                </div>
+              </>
             )}
 
           </div>

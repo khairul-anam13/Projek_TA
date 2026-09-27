@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { scaledInitialFontSize, computeFitFontSize, BASE_CANVAS_WIDTH_PX } from "../textLayout";
+import { scaledInitialFontSize, computeFitFontSize, computeFitLayout, BASE_CANVAS_WIDTH_PX } from "../textLayout";
 
 describe("scaledInitialFontSize (konsistensi ukuran teks editor vs preview vs ekspor)", () => {
   it("pada lebar kanvas dasar (400px), hasilnya sama seperti sebelum ada scaling", () => {
@@ -42,5 +42,25 @@ describe("computeFitFontSize aman dipanggil saat server-side render (lingkungan 
 
   it("tetap mengembalikan initialFontSize untuk teks kosong (jalur guard yang sudah ada)", () => {
     expect(computeFitFontSize("", 300, 60, 43, "Times New Roman", "bold")).toBe(43);
+  });
+});
+
+describe("computeFitLayout (dipakai CanvasFitText untuk merender baris PERSIS sama seperti drawTextInBox, tanpa word-wrap browser)", () => {
+  it("SSR (tanpa `document`): fontSize apa adanya, lines kosong — bukan throw", () => {
+    expect(() => computeFitLayout("NAMA SEKOLAH", 300, 60, 43, "Times New Roman", "bold")).not.toThrow();
+    expect(computeFitLayout("NAMA SEKOLAH", 300, 60, 43, "Times New Roman", "bold")).toEqual({
+      lines: [],
+      fontSize: 43,
+    });
+  });
+
+  it("teks kosong: lines kosong, fontSize apa adanya", () => {
+    expect(computeFitLayout("", 300, 60, 43, "Times New Roman", "bold")).toEqual({ lines: [], fontSize: 43 });
+  });
+
+  it("computeFitFontSize (deprecated) tetap konsisten dengan .fontSize dari computeFitLayout", () => {
+    expect(computeFitFontSize("NAMA SEKOLAH", 300, 60, 43, "Times New Roman", "bold")).toBe(
+      computeFitLayout("NAMA SEKOLAH", 300, 60, 43, "Times New Roman", "bold").fontSize
+    );
   });
 });
