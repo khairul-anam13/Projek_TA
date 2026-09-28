@@ -44,7 +44,7 @@ export default function HistoryPage({
         <Card className="shadow-sm p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-stone-100 pb-5 mb-5">
             <div>
-              <h2 className="text-lg font-bold text-stone-950 font-display-space flex items-center gap-2">
+              <h2 className="text-lg font-bold text-stone-950 flex items-center gap-2">
                 <Library className="w-5 h-5 text-brand-600" />
                 <span>Riwayat Proyek Percetakan</span>
               </h2>
@@ -106,7 +106,7 @@ export default function HistoryPage({
                         <Badge status="brand">{p.productType}</Badge>
                       </td>
                       <td className="p-4 font-semibold text-stone-600">{p.category}</td>
-                      <td className="p-4 text-stone-500 font-mono flex items-center gap-1">
+                      <td className="p-4 text-stone-500 flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-stone-300" />
                         {new Date(p.createdAt).toLocaleDateString("id-ID")}
                       </td>
@@ -153,7 +153,7 @@ export default function HistoryPage({
       </main>
 
       {/* Footer copyright */}
-      <footer className="text-center py-6 text-[10px] text-stone-400 font-mono">
+      <footer className="text-center py-6 text-[10px] text-stone-400">
         Arsip Cetak Cloud Page Free &bull; 2026
       </footer>
     </div>

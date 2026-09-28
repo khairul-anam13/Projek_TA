@@ -554,7 +554,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
           )}
 
           {mode === "3d" && (
-            <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-stone-600 font-mono">
+            <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-stone-600">
               Gerakkan kursor di atas desain untuk interaksi 3D
             </p>
           )}
@@ -610,14 +610,14 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
                       className="w-full h-8 rounded-lg border border-stone-200 shadow-inner"
                       style={{ backgroundColor: project.materialColor }}
                     />
-                    <span className="text-[9px] font-mono text-stone-400">Dasar</span>
+                    <span className="text-[9px] text-stone-400">Dasar</span>
                   </div>
                   <div className="flex-1 flex flex-col items-center gap-1">
                     <div
                       className="w-full h-8 rounded-lg border border-stone-200 shadow-inner"
                       style={{ backgroundColor: project.printMethod === "Embos Foil" ? "#D4AF37" : "#FFFFFF" }}
                     />
-                    <span className="text-[9px] font-mono text-stone-400">Tinta 1</span>
+                    <span className="text-[9px] text-stone-400">Tinta 1</span>
                   </div>
                   {project.printMethod === "Sablon" && (
                     <div className="flex-1 flex flex-col items-center gap-1">
@@ -625,7 +625,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
                         className="w-full h-8 rounded-lg border border-stone-200 shadow-inner"
                         style={{ backgroundColor: "#111111" }}
                       />
-                      <span className="text-[9px] font-mono text-stone-400">Tinta 2</span>
+                      <span className="text-[9px] text-stone-400">Tinta 2</span>
                     </div>
                   )}
                 </div>

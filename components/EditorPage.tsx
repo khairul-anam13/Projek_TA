@@ -621,7 +621,7 @@ export default function EditorPage({
           <button
             onClick={() => setZoom(1)}
             title="Reset ke 100% (Ctrl 0)"
-            className="w-11 text-center text-[11px] font-mono text-stone-500 hover:text-accent-600 cursor-pointer tabular-nums"
+            className="w-11 text-center text-[11px] text-stone-500 hover:text-accent-600 cursor-pointer tabular-nums"
           >
             {Math.round(zoom * 100)}%
           </button>
@@ -1069,7 +1069,7 @@ export default function EditorPage({
                             <input
                               type="number"
                               list="font-sizes"
-                              className={cn(fieldClass, "w-full font-mono")}
+                              className={cn(fieldClass, "w-full")}
                               value={selectedEl.fontSize || 14}
                               onChange={(e) => updateNumericField(selectedId!, "fontSize", e.target.value)}
                               onBlur={commitHistory}

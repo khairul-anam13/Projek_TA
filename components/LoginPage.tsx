@@ -43,7 +43,7 @@ export default function LoginPage() {
             <span className="font-extrabold text-xl tracking-tight text-stone-900">
               Page <span className="text-brand-600">Free</span>
             </span>
-            <span className="block text-[10px] text-stone-400 font-mono tracking-wider uppercase font-bold">
+            <span className="block text-[10px] text-stone-400 tracking-wider uppercase font-bold">
               AI-Powered Print Station
             </span>
           </div>
@@ -57,7 +57,7 @@ export default function LoginPage() {
             transition={{ duration: 0.5 }}
           >
             <div className="mb-8" id="login-welcome-text">
-              <h1 className="text-3xl font-bold tracking-tight text-stone-950 font-display-space">
+              <h1 className="text-3xl font-bold tracking-tight text-stone-950">
                 Selamat datang
               </h1>
               <p className="text-stone-500 mt-2 text-sm">
@@ -135,7 +135,7 @@ export default function LoginPage() {
 
         {/* Footer info */}
         <div className="text-center lg:text-left" id="login-footer">
-          <p className="text-xs text-stone-400 font-mono">
+          <p className="text-xs text-stone-400">
             Page Free v2.0.0 — © 2026 PT Kreatif Percetakan Indonesia
           </p>
         </div>
@@ -200,7 +200,7 @@ export default function LoginPage() {
                   <span className="block text-[11px] font-bold text-stone-800">Dian Sastrowardoyo</span>
                   <span className="block text-[7px] text-stone-400">Head of Fashion Curation</span>
                 </div>
-                <div className="flex justify-between items-center text-[6px] text-stone-400 font-mono">
+                <div className="flex justify-between items-center text-[6px] text-stone-400">
                   <span>☏ +62 811-9233</span>
                   <span>🌐 fashion.studio</span>
                 </div>
@@ -213,7 +213,7 @@ export default function LoginPage() {
               transition={{ delay: 0.4, duration: 0.8 }}
               className="mt-6"
             >
-              <h2 className="text-2xl font-bold tracking-tight font-display-space">
+              <h2 className="text-2xl font-bold tracking-tight">
                 Kreativitas Canva. Kepresisian Figma.
               </h2>
               <p className="text-stone-300 mt-3 text-sm leading-relaxed max-w-sm mx-auto">
@@ -224,7 +224,7 @@ export default function LoginPage() {
         </div>
 
         {/* Small badge */}
-        <div className="absolute bottom-8 right-8 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/60 text-[10px] font-mono tracking-wider">
+        <div className="absolute bottom-8 right-8 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/60 text-[10px] tracking-wider">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
           <span>SUPABASE AUTH ACTIVE</span>
         </div>

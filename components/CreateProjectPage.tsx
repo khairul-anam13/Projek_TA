@@ -248,7 +248,7 @@ export default function CreateProjectPage({
             <Sparkles className="w-10 h-10 text-brand-400 animate-pulse" />
           </div>
 
-          <h2 className="text-2xl font-bold mb-3 tracking-tight text-stone-100 font-display-space">AI Mengenerate Tata Letak</h2>
+          <h2 className="text-2xl font-bold mb-3 tracking-tight text-stone-100">AI Mengenerate Tata Letak</h2>
 
           <div className="w-full bg-stone-800/50 rounded-full h-2 mb-6 border border-stone-700/50 overflow-hidden">
             <div
@@ -274,7 +274,7 @@ export default function CreateProjectPage({
       <main className="flex-grow p-6 py-10" id="create-form-container">
         <div className="max-w-3xl mx-auto bg-surface rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
           <div className="p-8 border-b border-stone-100 bg-gradient-to-br from-stone-50 to-white">
-            <h2 className="text-xl font-bold text-stone-800 mb-2 font-display-space">Pilih Jenis Mockup & Informasi</h2>
+            <h2 className="text-xl font-bold text-stone-800 mb-2">Pilih Jenis Mockup & Informasi</h2>
             <p className="text-sm text-stone-500">
               Data ini akan digunakan untuk menyusun tata letak (layout) dan tipografi sampul secara otomatis.
             </p>
@@ -478,7 +478,7 @@ export default function CreateProjectPage({
         </div>
       </main>
 
-      <footer className="text-center py-6 text-[11px] text-stone-400 font-mono">
+      <footer className="text-center py-6 text-[11px] text-stone-400">
         Page Free Generator Platform — 2026 PT Indonesia
       </footer>
     </div>

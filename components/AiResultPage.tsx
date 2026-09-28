@@ -42,7 +42,7 @@ export default function AiResultPage({
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>AI Layout Generator Selesai</span>
           </span>
-          <h1 className="text-2xl font-bold tracking-tight text-stone-950 mt-2 font-display-space">
+          <h1 className="text-2xl font-bold tracking-tight text-stone-950 mt-2">
             Rekomendasi Tata Letak: <span className="text-brand-600">{formData.mockupType}</span>
           </h1>
           <p className="text-stone-500 text-sm mt-1">
@@ -82,7 +82,7 @@ export default function AiResultPage({
                       <span className="text-xs text-stone-500 mt-0.5">Tipe: {el.type} | Font: {el.fontFamily || '-'} | Ukuran: {el.fontSize || '-'}</span>
                     </div>
                     <div className="text-right">
-                      <span className="inline-block px-2.5 py-1 bg-white border border-stone-200 rounded-md text-[10px] font-mono text-stone-600 shadow-sm">
+                      <span className="inline-block px-2.5 py-1 bg-white border border-stone-200 rounded-md text-[10px] text-stone-600 shadow-sm">
                         Posisi Y: {el.y}%
                       </span>
                     </div>
@@ -126,7 +126,7 @@ export default function AiResultPage({
                 <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-bold text-brand-300 tracking-wider uppercase mb-3 inline-block">
                   Next Step
                 </span>
-                <h3 className="text-xl font-bold font-display-space mb-2 leading-tight">Mulai Kustomisasi Layout</h3>
+                <h3 className="text-xl font-bold mb-2 leading-tight">Mulai Kustomisasi Layout</h3>
                 <p className="text-stone-300 text-sm mb-6 leading-relaxed">
                   Buka editor untuk melihat hasil presisi penempatan yang telah dirumuskan AI, lalu tambahkan modifikasi akhir jika diperlukan.
                 </p>

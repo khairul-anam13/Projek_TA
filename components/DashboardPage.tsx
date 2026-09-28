@@ -84,10 +84,10 @@ export default function DashboardPage({
       <header className="relative border-b-2 border-ink px-5 sm:px-8">
         <div className="max-w-5xl w-full mx-auto py-5 flex items-center justify-between gap-4">
           <div>
-            <p className="font-layout-serif text-2xl leading-none text-ink">
+            <p className="text-2xl font-bold tracking-tight leading-none text-ink">
               Page<span className="text-foil">Free</span>
             </p>
-            <p className="mt-1.5 text-[9px] font-mono uppercase tracking-[0.25em] text-ink-soft">
+            <p className="mt-1.5 text-[9px] uppercase tracking-[0.25em] text-ink-soft">
               Studio Desain Cetak &middot; AI Assisted
             </p>
           </div>
@@ -102,7 +102,7 @@ export default function DashboardPage({
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-foil-tint border-2 border-ink flex items-center justify-center text-foil font-layout-serif font-bold text-sm">
+                <div className="w-9 h-9 rounded-full bg-foil-tint border-2 border-ink flex items-center justify-center text-foil font-bold text-sm">
                   {displayName.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -111,7 +111,7 @@ export default function DashboardPage({
             <IconButton
               onClick={onLogout}
               title="Keluar"
-              className="flex items-center gap-1.5 w-auto px-3 h-8 text-xs font-mono uppercase tracking-wide text-ink-soft hover:text-ink hover:bg-paper-deep"
+              className="flex items-center gap-1.5 w-auto px-3 h-8 text-xs uppercase tracking-wide text-ink-soft hover:text-ink hover:bg-paper-deep"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Keluar</span>
@@ -124,8 +124,8 @@ export default function DashboardPage({
 
         {/* Welcome */}
         <div>
-          <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-foil mb-2">{dateline}</p>
-          <h1 className="font-layout-serif text-3xl sm:text-4xl text-ink leading-tight">
+          <p className="text-[10px] uppercase tracking-[0.25em] text-foil mb-2">{dateline}</p>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-ink leading-tight">
             Selamat datang, {displayName}.
           </h1>
           <p className="text-ink-soft text-sm mt-2">
@@ -162,21 +162,21 @@ export default function DashboardPage({
                       {product.icon}
                     </span>
                     {product.available ? (
-                      <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-foil border border-foil/40 rounded-full px-2 py-0.5">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-foil border border-foil/40 rounded-full px-2 py-0.5">
                         Tersedia
                       </span>
                     ) : (
-                      <span className="text-[9px] font-mono uppercase tracking-wider text-ink-soft">Segera Hadir</span>
+                      <span className="text-[9px] uppercase tracking-wider text-ink-soft">Segera Hadir</span>
                     )}
                   </div>
-                  <h3 className="font-layout-serif text-lg text-ink mb-1.5">
+                  <h3 className="text-lg font-semibold text-ink mb-1.5">
                     {product.label}
                   </h3>
                   <p className="text-xs text-ink-soft leading-relaxed mb-4">
                     {product.description}
                   </p>
                   <div className="flex items-center justify-between pt-3 border-t border-paper-deep">
-                    <span className="text-[10px] font-mono text-ink-soft">
+                    <span className="text-[10px] text-ink-soft">
                       {product.dimension}
                     </span>
                     {product.available && (
@@ -211,7 +211,7 @@ export default function DashboardPage({
           {filteredProjects.length === 0 ? (
             <Card className="text-center py-16 border-dashed border-2 border-paper-deep bg-transparent" id="empty-state">
               <Layers className="w-9 h-9 text-ink-soft/40 mx-auto mb-3" />
-              <p className="text-sm font-layout-serif text-ink">
+              <p className="text-sm font-medium text-ink">
                 {projects.length === 0 ? "Belum ada desain" : "Tidak ditemukan"}
               </p>
               <p className="text-xs text-ink-soft mt-1">
@@ -286,7 +286,7 @@ export default function DashboardPage({
                     {/* Card info */}
                     <div className="p-4 flex flex-col gap-2 flex-grow border-t border-paper-deep">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-layout-serif text-base text-ink line-clamp-1 flex-1">
+                        <h4 className="text-base font-semibold text-ink line-clamp-1 flex-1">
                           {project.name}
                         </h4>
                         <Badge status={project.status === "Final" || project.status === "Selesai" ? "success" : "warning"}>
@@ -296,7 +296,7 @@ export default function DashboardPage({
                       <p className="text-[11px] text-ink-soft">{project.category}</p>
 
                       <div className="mt-auto pt-3 border-t border-paper-deep flex items-center justify-between">
-                        <span className="flex items-center gap-1 text-[10px] text-ink-soft font-mono">
+                        <span className="flex items-center gap-1 text-[10px] text-ink-soft">
                           <Clock className="w-3 h-3" />
                           {new Date(project.createdAt).toLocaleDateString("id-ID", {
                             day: "numeric",
@@ -324,7 +324,7 @@ export default function DashboardPage({
             <div className="mt-5 text-center">
               <button
                 onClick={onViewHistory}
-                className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wide text-foil hover:text-ink transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wide text-foil hover:text-ink transition cursor-pointer"
               >
                 <span>Lihat semua riwayat</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -335,7 +335,7 @@ export default function DashboardPage({
       </main>
 
       <footer className="relative border-t border-paper-deep py-5 text-center">
-        <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-ink-soft">
+        <p className="text-[10px] uppercase tracking-[0.15em] text-ink-soft">
           PageFree &mdash; Studio Desain Percetakan Berbasis AI &middot; 2026
         </p>
       </footer>

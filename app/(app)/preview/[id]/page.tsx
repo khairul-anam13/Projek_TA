@@ -40,7 +40,7 @@ export default function Preview() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-sm text-slate-400 font-mono">Memuat proyek...</p>
+        <p className="text-sm text-slate-400">Memuat proyek...</p>
       </div>
     );
   }
