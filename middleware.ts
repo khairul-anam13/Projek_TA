@@ -41,14 +41,21 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isApiRoute = pathname.startsWith("/api");
 
-  // Lindungi API routes proyek — kembalikan 401 jika tidak ada sesi
-  if (!user && pathname.startsWith("/api/projects")) {
+  // Lindungi API routes — kembalikan 401 jika tidak ada sesi. /api/gemini*
+  // ikut dilindungi supaya kuota Groq & proxy Kemendikdasmen tidak bisa
+  // dipakai orang tanpa login.
+  const isProtectedApi = pathname.startsWith("/api/projects") || pathname.startsWith("/api/gemini");
+  if (!user && isProtectedApi) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Harness QA internal: hanya untuk development, tidak boleh terekspos di production.
+  if (process.env.NODE_ENV === "production" && pathname.startsWith("/qa-test")) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
   // Lindungi halaman (non-API) — redirect ke /login jika belum ada sesi,
-  // atau jauhkan dari /login & / jika sudah login. /api/gemini* sengaja
-  // tidak disentuh sama sekali oleh blok ini.
+  // atau jauhkan dari /login & / jika sudah login.
   if (!isApiRoute) {
     const isPublicPage = pathname === "/login" || pathname.startsWith("/auth") || pathname.startsWith("/qa-test");
 

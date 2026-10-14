@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { safeNextPath } from "@/lib/utils";
 
 /**
  * Route Handler untuk OAuth Callback.
@@ -12,8 +13,10 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  // `next` bisa digunakan untuk menyimpan URL tujuan awal sebelum login
-  const next = searchParams.get("next") ?? "/";
+  // `next` bisa digunakan untuk menyimpan URL tujuan awal sebelum login.
+  // Divalidasi: hanya path internal, kalau tidak jadi open redirect
+  // (mis. next=@evil.com -> https://situs@evil.com).
+  const next = safeNextPath(searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();

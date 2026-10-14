@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-sans), sans-serif;
+  /* Satu-satunya font UI: Inter dengan fallback sans-serif sistem. Tidak ada
+     serif di chrome aplikasi (font desain cover di kanvas diatur terpisah). */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
   /*
    * Design system tokens — Page Free "modern SaaS" theme.

@@ -244,7 +244,6 @@ export default function DashboardPage({
                               project.backgroundColor === "#FDFCFA"
                                 ? "#1C1917"
                                 : "#FFFFFF",
-                            fontFamily: project.typography?.title || "sans-serif",
                           }}
                         >
                           {project.name}
@@ -257,7 +256,6 @@ export default function DashboardPage({
                               project.backgroundColor === "#FDFCFA"
                                 ? "#78716C"
                                 : "#D6D3D1",
-                            fontFamily: project.typography?.body || "sans-serif",
                           }}
                         >
                           {project.slogan || "Desain Sampul Rapor"}
