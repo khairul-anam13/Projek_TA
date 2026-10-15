@@ -32,6 +32,8 @@ export type ProductType = "Sampul Rapor";
 
 export type MockupType = "Rapor SD" | "Rapor SMP" | "Rapor SMA/SMK" | "Rapor MAN";
 
+export const MOCKUP_TYPES: readonly MockupType[] = ["Rapor SD", "Rapor SMP", "Rapor SMA/SMK", "Rapor MAN"];
+
 export interface ProductCatalogItem {
   type: ProductType;
   label: string;

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import PreviewPage from "@/components/PreviewPage";
 import EditorPage from "@/components/EditorPage";
 import CreateProjectPage from "@/components/CreateProjectPage";
+import BatchPage from "@/components/BatchPage";
 import { getMockupTemplate } from "@/lib/mockupTemplates";
 import { drawTextInBox } from "@/lib/textLayout";
 import { DesignProject, PrintSize } from "@/lib/types";
@@ -190,6 +191,9 @@ export default function QaPage() {
             onExport={async () => {}}
           />
         </div>
+      </div>
+      <div id="batch-qa" style={{ borderBottom: "1px solid #ccc" }}>
+        <BatchPage onBack={() => {}} />
       </div>
       <div style={{ padding: 24, display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div>

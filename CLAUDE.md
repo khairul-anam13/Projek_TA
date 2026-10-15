@@ -9,7 +9,7 @@ Alat desain **sampul rapor siap cetak** untuk percetakan: pilih template → isi
 - **Template:** kurasi sendiri (registry di `lib/templates.ts`), bukan buatan pengguna.
 - **Output utama:** PDF/SVG **vektor** ukuran asli (artwork saja). PNG/PDF raster hanya pratinjau.
 - **AI** (Groq) hanya pembantu opsional; layout utama dari template yang deterministik.
-- Belum dikerjakan (fase lanjut): batch CSV banyak sekolah, tautan persetujuan klien, pustaka logo resmi + profil sekolah tersimpan, teks→kurva.
+- Belum dikerjakan (fase lanjut): tautan persetujuan klien, pustaka logo resmi + profil sekolah tersimpan, teks→kurva.
 
 ## Perintah
 
@@ -31,7 +31,7 @@ Alias import: `@/*` → root proyek.
 
 ## Alur halaman
 
-`/login` → `/dashboard` → `/create` (data sekolah + ukuran + **galeri template**) → `/editor/[id]` → `/preview/[id]` (cek siap cetak + ekspor); `/create/result` hanya untuk jalur AI; `/history` = arsip.
+`/login` → `/dashboard` → `/create` (data sekolah + ukuran + **galeri template**) → `/editor/[id]` → `/preview/[id]` (cek siap cetak + ekspor); `/create/result` hanya untuk jalur AI; `/history` = arsip; `/batch` = unggah CSV banyak sekolah → ZIP PDF/SVG vektor (tautan dari dashboard, tidak menyimpan proyek ke database).
 
 - `middleware.ts`: refresh sesi Supabase; redirect belum-login ke `/login`, sudah-login dari `/`/`/login` ke `/dashboard`; `/api/projects*` dan `/api/gemini*` balas 401 tanpa sesi (route gemini hanya dijaga middleware). `/qa-test` 404 di production, publik hanya di dev.
 - `app/auth/callback`: parameter `next` wajib lewat `safeNextPath` (`lib/utils.ts`), jangan dipakai mentah (open redirect).
@@ -49,6 +49,7 @@ Alias import: `@/*` → root proyek.
 | Mika & ukuran | `lib/canvasConstraints.ts` | `getPrintSizeCm`, `getMikaRect`, `getMikaZone` (dari ukuran fisik), snap, resize, overlap, impor gambar |
 | Cek siap cetak | `lib/preflight.ts` | `runPreflight(project)`: mika, kanvas/margin 8 mm, font ≥ 7 pt (butuh browser), warna tinta, raster, non-Latin, tumpukan |
 | Ekspor vektor | `lib/vectorExport.ts` | `buildScene` → `sceneToSvg` / `sceneToPdf`; mm ukuran asli, artwork saja |
+| Batch CSV | `lib/csv.ts`, `lib/batch.ts`, `lib/zip.ts`, `components/BatchPage.tsx` | `parseCsv` (RFC 4180, auto `,`/`;`, baris kosong dipertahankan agar indeks = baris spreadsheet) → `parseBatchCsv` (header toleran, kolom wajib `judulRapor/namaSekolah/alamatSekolah/subInformasi`, `mockupType` opsional; baris salah masuk `errors`, tidak menghentikan baris lain) → `buildBatchCover` (template + `buildScene` + `runPreflight` + byte PDF/SVG) / `runBatch` (bertahap, `setTimeout(0)` per baris) → `zipStore` (ZIP tanpa kompresi, tanpa dependensi). `namaSekolah` kosong = baris dilewati; alamat/sub informasi kosong = elemen terikat dihapus (bukan placeholder); judul kosong = judul bawaan. Nama berkas `NNN_Nama_Sekolah.pdf/.svg` (NNN = nomor baris spreadsheet). CSV contoh: `public/contoh-batch.csv` |
 | Utilitas SVG | `lib/svgUtils.ts` | `parsePath`, `parseCustomSvg` (menjamin viewBox hasil potrace), `customSvgMarkup` |
 | Ikon logo | `lib/logoIcons.ts` | Satu sumber path ikon untuk editor, preview, PNG, vektor |
 | Layout teks | `lib/textLayout.ts` | Wrap + shrink-to-fit (binary search). Kata tunggal terlalu lebar terus mengecil, bukan dipotong "…" (kecuali sudah di ukuran minimum) |
@@ -63,7 +64,7 @@ Alias import: `@/*` → root proyek.
 | Galeri template | `components/CreateProjectPage.tsx` | Pilihan ukuran A/B + kartu template berpratinjau data sendiri |
 | Teks SVG | `components/CanvasFitText.tsx` | Render `lines` hasil `computeFitLayout` persis, tanpa word-wrap browser |
 | UI kit | `components/ui/*` | `Button`, `IconButton`, `Card`, `Badge`, `Input`, `PageHeader` (cva + `cn`) |
-| Harness QA | `app/qa-test/page.tsx` | Dev-only: semua template × ukuran (pratinjau vs ekspor vektor), form create, editor, preview |
+| Harness QA | `app/qa-test/page.tsx` | Dev-only: semua template × ukuran (pratinjau vs ekspor vektor), form create, batch CSV, editor, preview |
 
 ## Aturan bisnis yang tidak boleh rusak
 
@@ -99,4 +100,5 @@ Tambah objek di `TEMPLATES` (`lib/templates.ts`) dengan `build(ctx)` memakai `to
 - Ambang preflight (margin 8 mm, font minimum 7 pt) adalah asumsi awal; konfirmasi ke percetakan.
 - Field warisan `palette`, `typography`, `slogan`, `concept`, `audience`, `category` dan `PRODUCT_CATALOG` masih ada walau tidak lagi dipakai alur utama.
 - `app/qa-test/page.tsx` punya error lint lama (`setMounted` di effect).
+- Batch CSV dibaca sebagai UTF-8 (CSV ANSI/Windows-1252 dari Excel merusak karakter non-ASCII); baris dengan temuan preflight tetap ikut ZIP (hanya ditandai di tabel); tanpa pratinjau gambar per sekolah.
 - Aset `user_assets` (hasil tracing) tersimpan tetapi belum ada UI untuk memakainya ulang.

@@ -45,6 +45,7 @@ export default function Dashboard() {
       onPreviewProject={(project: DesignProject) => router.push(`/preview/${project.id}`)}
       onDeleteProject={handleDeleteProject}
       onViewHistory={() => router.push("/history")}
+      onBatch={() => router.push("/batch")}
       onLogout={handleLogout}
     />
   );

@@ -26,6 +26,7 @@ interface DashboardPageProps {
   onPreviewProject: (project: DesignProject) => void;
   onDeleteProject: (id: string) => void;
   onViewHistory: () => void;
+  onBatch: () => void;
   onLogout: () => void;
 }
 
@@ -50,6 +51,7 @@ export default function DashboardPage({
   onPreviewProject,
   onDeleteProject,
   onViewHistory,
+  onBatch,
   onLogout,
 }: DashboardPageProps) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -108,6 +110,14 @@ export default function DashboardPage({
               )}
               <span className="text-sm text-ink font-medium">{displayName}</span>
             </div>
+            <IconButton
+              onClick={onBatch}
+              title="Batch dari CSV"
+              className="flex items-center gap-1.5 w-auto px-3 h-8 text-xs uppercase tracking-wide text-ink-soft hover:text-ink hover:bg-paper-deep"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Batch CSV</span>
+            </IconButton>
             <IconButton
               onClick={onLogout}
               title="Keluar"
