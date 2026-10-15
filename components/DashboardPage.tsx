@@ -15,12 +15,16 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { Card, Badge, Input, IconButton } from "@/components/ui";
+import { DesignCanvas } from "./DesignCanvas";
+import { getCardRatio } from "@/lib/canvasConstraints";
 
 interface DashboardPageProps {
   userEmail: string;
   userName?: string;
   avatarUrl?: string;
   projects: DesignProject[];
+  /** true selama daftar proyek dimuat, supaya tidak berkedip "Belum ada desain". */
+  loading?: boolean;
   onCreateProject: (productType: ProductType) => void;
   onEditProject: (project: DesignProject) => void;
   onPreviewProject: (project: DesignProject) => void;
@@ -30,11 +34,10 @@ interface DashboardPageProps {
   onLogout: () => void;
 }
 
-/** Label eyebrow bergaya editorial (garis pendek + huruf kecil renggang) —
- * dipakai berulang di beranda ini sebagai pengganti label abu-abu generik. */
+/** Judul seksi bergaya editorial (garis emas pendek di depan teks). */
 function SectionEyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-ink-soft">
+    <h2 className="flex items-center gap-2 text-xs font-semibold tracking-wide text-ink-soft">
       <span className="h-px w-4 bg-foil" />
       {children}
     </h2>
@@ -46,6 +49,7 @@ export default function DashboardPage({
   userName,
   avatarUrl,
   projects,
+  loading = false,
   onCreateProject,
   onEditProject,
   onPreviewProject,
@@ -89,9 +93,7 @@ export default function DashboardPage({
             <p className="text-2xl font-bold tracking-tight leading-none text-ink">
               Page<span className="text-foil">Free</span>
             </p>
-            <p className="mt-1.5 text-[9px] uppercase tracking-[0.25em] text-ink-soft">
-              Studio Desain Cetak &middot; AI Assisted
-            </p>
+            <p className="mt-1.5 text-[11px] tracking-wide text-ink-soft">Studio desain cetak</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -113,7 +115,7 @@ export default function DashboardPage({
             <IconButton
               onClick={onBatch}
               title="Batch dari CSV"
-              className="flex items-center gap-1.5 w-auto px-3 h-8 text-xs uppercase tracking-wide text-ink-soft hover:text-ink hover:bg-paper-deep"
+              className="flex items-center gap-1.5 w-auto px-3 h-8 text-xs font-medium text-ink-soft hover:text-ink hover:bg-paper-deep"
             >
               <Layers className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Batch CSV</span>
@@ -121,7 +123,7 @@ export default function DashboardPage({
             <IconButton
               onClick={onLogout}
               title="Keluar"
-              className="flex items-center gap-1.5 w-auto px-3 h-8 text-xs uppercase tracking-wide text-ink-soft hover:text-ink hover:bg-paper-deep"
+              className="flex items-center gap-1.5 w-auto px-3 h-8 text-xs font-medium text-ink-soft hover:text-ink hover:bg-paper-deep"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Keluar</span>
@@ -134,7 +136,7 @@ export default function DashboardPage({
 
         {/* Welcome */}
         <div>
-          <p className="text-[10px] uppercase tracking-[0.25em] text-foil mb-2">{dateline}</p>
+          <p className="text-xs font-medium tracking-wide text-foil mb-2">{dateline}</p>
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-ink leading-tight">
             Selamat datang, {displayName}.
           </h1>
@@ -172,11 +174,11 @@ export default function DashboardPage({
                       {product.icon}
                     </span>
                     {product.available ? (
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-foil border border-foil/40 rounded-full px-2 py-0.5">
+                      <span className="text-[11px] font-semibold text-foil border border-foil/40 rounded-full px-2 py-0.5">
                         Tersedia
                       </span>
                     ) : (
-                      <span className="text-[9px] uppercase tracking-wider text-ink-soft">Segera Hadir</span>
+                      <span className="text-[11px] text-ink-soft">Segera hadir</span>
                     )}
                   </div>
                   <h3 className="text-lg font-semibold text-ink mb-1.5">
@@ -186,13 +188,13 @@ export default function DashboardPage({
                     {product.description}
                   </p>
                   <div className="flex items-center justify-between pt-3 border-t border-paper-deep">
-                    <span className="text-[10px] text-ink-soft">
+                    <span className="text-xs text-ink-soft">
                       {product.dimension}
                     </span>
                     {product.available && (
-                      <div className="flex items-center gap-1 text-xs text-foil font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-foil font-semibold">
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Buat Baru</span>
+                        <span>Buat baru</span>
                       </div>
                     )}
                   </div>
@@ -213,12 +215,19 @@ export default function DashboardPage({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Cari desain..."
+                aria-label="Cari desain"
                 className="pl-9 py-2 text-xs sm:w-64 border-paper-deep focus:border-foil focus:ring-foil-tint"
               />
             </div>
           </div>
 
-          {filteredProjects.length === 0 ? (
+          {loading && projects.length === 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" role="status" aria-label="Memuat desain">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-72 rounded-lg border border-paper-deep bg-white animate-pulse" />
+              ))}
+            </div>
+          ) : filteredProjects.length === 0 ? (
             <Card className="text-center py-16 border-dashed border-2 border-paper-deep bg-transparent" id="empty-state">
               <Layers className="w-9 h-9 text-ink-soft/40 mx-auto mb-3" />
               <p className="text-sm font-medium text-ink">
@@ -237,86 +246,66 @@ export default function DashboardPage({
                   key={project.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
+                  transition={{ delay: Math.min(i, 8) * 0.04 }}
                 >
-                  <Card hover className="group flex flex-col overflow-hidden border-paper-deep rounded-lg" id={`project-card-${project.id}`}>
-                    {/* Contoh mini dari desain asli (warna & tipografi proyek) */}
-                    <div
-                      className="h-28 relative overflow-hidden flex items-center justify-center"
-                      style={{ backgroundColor: project.backgroundColor || "#f8f7f4" }}
+                  <Card hover className="group flex h-full flex-col overflow-hidden border-paper-deep rounded-lg" id={`project-card-${project.id}`}>
+                    {/* Pratinjau desain asli; klik membuka editor */}
+                    <button
+                      type="button"
+                      onClick={() => onEditProject(project)}
+                      aria-label={`Buka editor: ${project.name}`}
+                      className="flex h-44 w-full cursor-pointer items-center justify-center bg-paper-deep/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foil"
                     >
-                      <div className="text-center px-3">
-                        <p
-                          className="text-[10px] font-extrabold uppercase tracking-wide line-clamp-1"
-                          style={{
-                            color:
-                              project.backgroundColor === "#FFFFFF" ||
-                              project.backgroundColor === "#FDFCFA"
-                                ? "#1C1917"
-                                : "#FFFFFF",
-                          }}
-                        >
-                          {project.name}
-                        </p>
-                        <p
-                          className="text-[7px] mt-0.5 line-clamp-1 italic"
-                          style={{
-                            color:
-                              project.backgroundColor === "#FFFFFF" ||
-                              project.backgroundColor === "#FDFCFA"
-                                ? "#78716C"
-                                : "#D6D3D1",
-                          }}
-                        >
-                          {project.slogan || "Desain Sampul Rapor"}
-                        </p>
-                      </div>
+                      <DesignCanvas
+                        project={project}
+                        width={Math.round(148 * getCardRatio(project.printSize))}
+                        height={148}
+                        borderRadius={3}
+                      />
+                    </button>
 
-                      {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-ink/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => onEditProject(project)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-ink rounded-md text-[11px] font-bold cursor-pointer hover:bg-paper transition"
-                          title="Edit"
-                        >
-                          <Edit className="w-3 h-3" /> Edit
-                        </button>
-                        <button
-                          onClick={() => onPreviewProject(project)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-foil text-white rounded-md text-[11px] font-bold cursor-pointer hover:bg-foil/90 transition"
-                          title="Pratinjau"
-                        >
-                          <Eye className="w-3 h-3" /> Lihat
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Card info */}
                     <div className="p-4 flex flex-col gap-2 flex-grow border-t border-paper-deep">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-base font-semibold text-ink line-clamp-1 flex-1">
+                        <h3 className="text-base font-semibold text-ink line-clamp-1 flex-1" title={project.name}>
                           {project.name}
-                        </h4>
+                        </h3>
                         <Badge status={project.status === "Final" || project.status === "Selesai" ? "success" : "warning"}>
                           {project.status}
                         </Badge>
                       </div>
-                      <p className="text-[11px] text-ink-soft">{project.category}</p>
+                      <p className="text-xs text-ink-soft">
+                        {[project.mockupType, project.printSize?.replace("Size ", "Ukuran ")].filter(Boolean).join(", ") ||
+                          project.category}
+                      </p>
+                      <p className="flex items-center gap-1 text-xs text-ink-soft">
+                        <Clock className="w-3 h-3" />
+                        {new Date(project.createdAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
 
-                      <div className="mt-auto pt-3 border-t border-paper-deep flex items-center justify-between">
-                        <span className="flex items-center gap-1 text-[10px] text-ink-soft">
-                          <Clock className="w-3 h-3" />
-                          {new Date(project.createdAt).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </span>
+                      <div className="mt-auto pt-3 border-t border-paper-deep flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onEditProject(project)}
+                          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-paper-deep px-3 py-2 text-xs font-semibold text-ink transition hover:bg-paper-deep"
+                        >
+                          <Edit className="w-3.5 h-3.5" /> Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onPreviewProject(project)}
+                          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-foil/40 px-3 py-2 text-xs font-semibold text-foil transition hover:bg-foil-tint"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Pratinjau
+                        </button>
                         <IconButton
                           variant="destructive"
-                          size="sm"
+                          size="md"
                           onClick={() => onDeleteProject(project.id)}
-                          title="Hapus"
+                          title={`Hapus ${project.name}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </IconButton>
@@ -332,7 +321,7 @@ export default function DashboardPage({
             <div className="mt-5 text-center">
               <button
                 onClick={onViewHistory}
-                className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wide text-foil hover:text-ink transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-foil hover:text-ink transition cursor-pointer"
               >
                 <span>Lihat semua riwayat</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -343,9 +332,7 @@ export default function DashboardPage({
       </main>
 
       <footer className="relative border-t border-paper-deep py-5 text-center">
-        <p className="text-[10px] uppercase tracking-[0.15em] text-ink-soft">
-          PageFree &mdash; Studio Desain Percetakan Berbasis AI &middot; 2026
-        </p>
+        <p className="text-xs text-ink-soft">PageFree, studio desain sampul rapor siap cetak. 2026</p>
       </footer>
     </div>
   );

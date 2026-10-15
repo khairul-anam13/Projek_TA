@@ -26,11 +26,11 @@ export default function AiResultPage({
     <div className="min-h-screen bg-canvas flex flex-col" id="ai-result-layout">
       <PageHeader
         onBack={onBack}
-        backLabel="Kembali Ke Form"
+        backLabel="Kembali ke formulir"
         right={
           <div className="flex items-center gap-1.5 font-medium text-xs text-stone-500">
             <Sparkles className="w-3.5 h-3.5 text-brand-500 animate-pulse" />
-            <span>Rekomendasi AI berhasil dibuat</span>
+            <span>Rekomendasi AI siap</span>
           </div>
         }
       />
@@ -40,13 +40,13 @@ export default function AiResultPage({
         <div className="text-center mb-8">
           <span className="px-3 py-1 bg-amber-50 rounded-full text-amber-600 text-xs font-bold border border-amber-100 flex items-center gap-1.5 w-fit mx-auto">
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>AI Layout Generator Selesai</span>
+            <span>Tata letak AI siap</span>
           </span>
           <h1 className="text-2xl font-bold tracking-tight text-stone-950 mt-2">
             Rekomendasi Tata Letak: <span className="text-brand-600">{formData.mockupType}</span>
           </h1>
           <p className="text-stone-500 text-sm mt-1">
-            Gemini AI telah memposisikan ulang seluruh elemen dan teks Anda sesuai standar cetak formal.
+            AI telah menata ulang elemen dan teks Anda mengikuti ukuran cetak dan jendela mika.
           </p>
         </div>
 
@@ -59,7 +59,7 @@ export default function AiResultPage({
             {/* Description Card */}
             <Card className="p-6 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/5 rounded-bl-full -mr-8 -mt-8" />
-              <h3 className="font-bold text-stone-900 text-sm tracking-tight mb-3 uppercase text-brand-700 flex items-center gap-2">
+              <h3 className="font-bold text-stone-900 text-sm tracking-tight mb-3 text-brand-700 flex items-center gap-2">
                 <LayoutTemplate size={16}/> Konsep & Hierarki
               </h3>
               <p className="text-stone-700 leading-relaxed text-sm">
@@ -71,7 +71,7 @@ export default function AiResultPage({
             <Card className="p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-4 text-brand-600">
                 <AlignCenter className="w-5 h-5 text-brand-600" />
-                <h3 className="font-bold text-stone-900 text-sm tracking-tight uppercase">Komponen yang Dihasilkan</h3>
+                <h3 className="font-bold text-stone-900 text-sm tracking-tight">Komponen yang dihasilkan</h3>
               </div>
 
               <div className="space-y-3">
@@ -99,7 +99,7 @@ export default function AiResultPage({
               <Card className="p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <Info className="w-5 h-5 text-brand-600" />
-                  <h3 className="font-bold text-stone-900 text-sm tracking-tight uppercase">Opsi Sub Informasi</h3>
+                  <h3 className="font-bold text-stone-900 text-sm tracking-tight">Opsi sub informasi</h3>
                 </div>
                 <p className="text-xs text-stone-500 mb-4">Pilih salah satu rekomendasi AI untuk informasi tambahan:</p>
                 <div className="space-y-2">
@@ -123,7 +123,7 @@ export default function AiResultPage({
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20" />
 
               <div className="relative z-10">
-                <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-bold text-brand-300 tracking-wider uppercase mb-3 inline-block">
+                <span className="px-2 py-1 bg-white/10 rounded text-[11px] font-semibold text-brand-300 mb-3 inline-block">
                   Next Step
                 </span>
                 <h3 className="text-xl font-bold mb-2 leading-tight">Mulai Kustomisasi Layout</h3>

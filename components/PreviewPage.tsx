@@ -408,7 +408,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
 
             {/* Print specs */}
             <div className="p-4 bg-stone-50 rounded-lg border border-stone-200 space-y-2.5">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+              <h3 className="text-xs font-semibold text-stone-500">
                 Spesifikasi Cetak
               </h3>
               {[
@@ -476,7 +476,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
             {/* AI Slogan */}
             {project.slogan && (
               <div className="p-4 bg-teal-50 border border-teal-100 rounded-xl">
-                <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest mb-1.5">
+                <p className="text-xs font-semibold text-teal-700 mb-1.5">
                   Slogan Rekomendasi AI
                 </p>
                 <p className="text-sm text-stone-700 italic leading-relaxed">
@@ -488,21 +488,21 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
             {/* Material Colors */}
             {project.materialColor && (
               <div>
-                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2">Bahan & Tinta</p>
+                <p className="text-xs font-semibold text-stone-500 mb-2">Bahan & Tinta</p>
                 <div className="flex gap-2">
                   <div className="flex-1 flex flex-col items-center gap-1">
                     <div
                       className="w-full h-8 rounded-lg border border-stone-200 shadow-inner"
                       style={{ backgroundColor: project.materialColor }}
                     />
-                    <span className="text-[9px] text-stone-400">Dasar</span>
+                    <span className="text-[11px] text-stone-500">Dasar</span>
                   </div>
                   <div className="flex-1 flex flex-col items-center gap-1">
                     <div
                       className="w-full h-8 rounded-lg border border-stone-200 shadow-inner"
                       style={{ backgroundColor: project.printMethod === "Embos Foil" ? "#D4AF37" : "#FFFFFF" }}
                     />
-                    <span className="text-[9px] text-stone-400">Tinta 1</span>
+                    <span className="text-[11px] text-stone-500">Tinta 1</span>
                   </div>
                   {project.printMethod === "Sablon" && (
                     <div className="flex-1 flex flex-col items-center gap-1">
@@ -510,7 +510,7 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
                         className="w-full h-8 rounded-lg border border-stone-200 shadow-inner"
                         style={{ backgroundColor: "#111111" }}
                       />
-                      <span className="text-[9px] text-stone-400">Tinta 2</span>
+                      <span className="text-[11px] text-stone-500">Tinta 2</span>
                     </div>
                   )}
                 </div>

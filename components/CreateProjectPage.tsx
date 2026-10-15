@@ -122,6 +122,15 @@ export default function CreateProjectPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ namaSekolah: query, kabupaten }),
       });
+      if (res.status === 401) {
+        if (token !== searchTokenRef.current) return;
+        setSchoolLookup({
+          status: "error",
+          message: "Sesi Anda berakhir. Muat ulang halaman atau masuk kembali untuk mencari data sekolah.",
+          suggestions: [],
+        });
+        return;
+      }
       const data = await res.json();
       if (token !== searchTokenRef.current) return; // ada pencarian lebih baru; abaikan hasil ini
 
@@ -199,10 +208,10 @@ export default function CreateProjectPage({
   // Rotating tips shown during the AI generation process
   const loadingTips = [
     "Menyesuaikan grid dan layout dengan format cetak standar...",
-    "Merelasikan font Display & Body agar pas dengan margin mockup...",
-    "Gemini AI sedang menyusun komposisi teks terbaik...",
-    "Memformulasikan tata letak agar presisi dengan ukuran A4/F4...",
-    "Menyelesaikan paket rekomendasi desain high-fidelity Anda..."
+    "Menyesuaikan ukuran font dengan margin sampul...",
+    "AI sedang menyusun komposisi teks terbaik...",
+    "Menjaga teks tetap di luar jendela mika nama...",
+    "Menyelesaikan rekomendasi tata letak Anda..."
   ];
 
   const handleValidation = () => {
@@ -374,10 +383,11 @@ export default function CreateProjectPage({
               {/* Dynamic Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-stone-700 mb-1.5">
-                    Judul Rapor
+                  <label htmlFor="field-judul-rapor" className="block text-sm font-bold text-stone-700 mb-1.5">
+                    Judul rapor
                   </label>
                   <Input
+                    id="field-judul-rapor"
                     type="text"
                     value={judulRapor}
                     onChange={(e) => setJudulRapor(e.target.value)}
@@ -386,11 +396,13 @@ export default function CreateProjectPage({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-stone-700 mb-1.5">
-                    Nama Sekolah <span className="text-rose-500">*</span>
+                  <label htmlFor="field-nama-sekolah" className="block text-sm font-bold text-stone-700 mb-1.5">
+                    Nama sekolah <span className="text-rose-500" aria-hidden="true">*</span>
+                    <span className="sr-only">(wajib diisi)</span>
                   </label>
                   <div className="flex gap-2">
                     <Input
+                      id="field-nama-sekolah"
                       type="text"
                       className="font-semibold text-stone-800 placeholder:font-normal"
                       value={namaSekolah}
@@ -477,10 +489,11 @@ export default function CreateProjectPage({
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-stone-700 mb-1.5">
-                  Alamat Sekolah
+                <label htmlFor="field-alamat-sekolah" className="block text-sm font-bold text-stone-700 mb-1.5">
+                  Alamat sekolah
                 </label>
                 <Input
+                  id="field-alamat-sekolah"
                   type="text"
                   value={alamatSekolah}
                   onChange={(e) => setAlamatSekolah(e.target.value)}
@@ -492,10 +505,11 @@ export default function CreateProjectPage({
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-stone-700 mb-1.5">
-                  Sub Informasi & Keterangan Tambahan
+                <label htmlFor="field-sub-informasi" className="block text-sm font-bold text-stone-700 mb-1.5">
+                  Sub informasi & keterangan tambahan
                 </label>
                 <Textarea
+                  id="field-sub-informasi"
                   className="h-24"
                   value={subInformasi}
                   onChange={(e) => setSubInformasi(e.target.value)}

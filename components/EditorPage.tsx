@@ -537,8 +537,33 @@ export default function EditorPage({
     };
   }, []);
 
+  const handleSave = useCallback(() => {
+    if (pendingSaveRef.current) return; // simpan sebelumnya masih berjalan
+    const savePromise = (async () => {
+      setIsSaving(true);
+      try {
+        const { persisted } = await onSaveProject(project);
+        toast(persisted ? "Proyek tersimpan" : "Tersimpan lokal — server tidak merespons");
+      } catch {
+        toast("Gagal menyimpan proyek. Coba lagi.");
+      } finally {
+        setIsSaving(false);
+      }
+    })();
+    pendingSaveRef.current = savePromise;
+    savePromise.finally(() => {
+      if (pendingSaveRef.current === savePromise) pendingSaveRef.current = null;
+    });
+  }, [onSaveProject, project, toast]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Ctrl/Cmd+S berlaku juga saat fokus di kolom input, dan mencegah dialog "Simpan halaman" browser.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
       const tag = (document.activeElement as HTMLElement)?.tagName;
       if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
 
@@ -568,7 +593,7 @@ export default function EditorPage({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, handleUndo, handleRedo, duplicateSelected, deleteSelected, updateElement, project.elements, mikaZone]);
+  }, [selectedId, handleUndo, handleRedo, handleSave, duplicateSelected, deleteSelected, updateElement, project.elements, mikaZone]);
 
 
   const selectedEl = project.elements.find((e) => e.id === selectedId);
@@ -614,10 +639,10 @@ export default function EditorPage({
 
         <div className="w-px h-5 bg-stone-200 mx-1" />
 
-        <IconButton size="sm" onClick={handleUndo} disabled={historyIndex === 0} title="Undo (Ctrl+Z)">
+        <IconButton size="sm" onClick={handleUndo} disabled={historyIndex === 0} title="Urungkan (Ctrl+Z)">
           <Undo size={15} />
         </IconButton>
-        <IconButton size="sm" onClick={handleRedo} disabled={historyIndex >= history.length - 1} title="Redo (Ctrl+Y)">
+        <IconButton size="sm" onClick={handleRedo} disabled={historyIndex >= history.length - 1} title="Ulangi (Ctrl+Y)">
           <Redo size={15} />
         </IconButton>
 
@@ -647,7 +672,7 @@ export default function EditorPage({
           size="sm"
           onClick={() => setShowGrid(!showGrid)}
           className={showGrid ? "bg-accent-50 text-accent-600" : undefined}
-          title="Snap to Grid"
+          title={showGrid ? "Sembunyikan grid" : "Tampilkan grid"}
         >
           <Grid size={15} />
         </IconButton>
@@ -669,26 +694,10 @@ export default function EditorPage({
           size="sm"
           disabled={isSaving}
           className="rounded-md shadow-none"
-          onClick={() => {
-            const savePromise = (async () => {
-              setIsSaving(true);
-              try {
-                const { persisted } = await onSaveProject(project);
-                toast(persisted ? "Proyek tersimpan" : "Tersimpan lokal — server tidak merespons");
-              } catch {
-                toast("Gagal menyimpan proyek. Coba lagi.");
-              } finally {
-                setIsSaving(false);
-              }
-            })();
-            pendingSaveRef.current = savePromise;
-            savePromise.finally(() => {
-              if (pendingSaveRef.current === savePromise) pendingSaveRef.current = null;
-            });
-          }}
-          title="Simpan Proyek (Ctrl+S)"
+          onClick={handleSave}
+          title="Simpan proyek (Ctrl+S)"
         >
-          {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
+          {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Simpan
         </Button>
         <Button
           variant="primary"
@@ -707,7 +716,7 @@ export default function EditorPage({
           }}
           title="Ekspor ke PDF atau Print"
         >
-          {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Export / Print
+          {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Ekspor / Cetak
         </Button>
       </header>
 
@@ -718,24 +727,24 @@ export default function EditorPage({
           <IconButton
             size="sm"
             className={!selectedId ? "bg-accent-50 text-accent-600" : undefined}
-            title="Pick Tool"
+            title="Pilih & geser elemen"
           >
             <MousePointer2 size={16} />
           </IconButton>
           <div className="w-5 h-px bg-stone-200 my-1" />
-          <IconButton size="sm" onClick={() => { addElement('shape', { shapeType: 'rectangle' }); setActiveDocker('properties'); }} title="Rectangle Tool (F6)">
+          <IconButton size="sm" onClick={() => { addElement('shape', { shapeType: 'rectangle' }); setActiveDocker('properties'); }} title="Tambah persegi">
             <Square size={16} />
           </IconButton>
-          <IconButton size="sm" onClick={() => { addElement('shape', { shapeType: 'circle' }); setActiveDocker('properties'); }} title="Ellipse Tool (F7)">
+          <IconButton size="sm" onClick={() => { addElement('shape', { shapeType: 'circle' }); setActiveDocker('properties'); }} title="Tambah lingkaran">
             <Circle size={16} />
           </IconButton>
-          <IconButton size="sm" onClick={() => setActiveDocker('elements')} title="Text Tool (Open presets)">
+          <IconButton size="sm" onClick={() => setActiveDocker('elements')} title="Tambah teks (buka gaya teks)">
             <TypeIcon size={16} />
           </IconButton>
-          <IconButton size="sm" onClick={() => { addElement('shape', { shapeType: 'line', width: 40, height: 1 }); setActiveDocker('properties'); }} title="Freehand Tool">
+          <IconButton size="sm" onClick={() => { addElement('shape', { shapeType: 'line', width: 40, height: 1 }); setActiveDocker('properties'); }} title="Tambah garis">
             <Minus size={16} />
           </IconButton>
-          <IconButton size="sm" onClick={() => setActiveDocker('elements')} title="Stamp & Icons Tool">
+          <IconButton size="sm" onClick={() => setActiveDocker('elements')} title="Stempel & ikon">
             <Sparkles size={16} />
           </IconButton>
         </div>
@@ -946,6 +955,7 @@ export default function EditorPage({
                           {f.multiline ? (
                             <textarea
                               rows={3}
+                              aria-label={f.label}
                               className={cn(fieldClass, "w-full resize-none")}
                               value={project.dynamicData?.[f.key] ?? ""}
                               onChange={(e) => setSchoolField(f.key, e.target.value)}
@@ -954,6 +964,7 @@ export default function EditorPage({
                           ) : (
                             <input
                               type="text"
+                              aria-label={f.label}
                               className={cn(fieldClass, "w-full")}
                               value={project.dynamicData?.[f.key] ?? ""}
                               onChange={(e) => setSchoolField(f.key, e.target.value)}
@@ -980,6 +991,7 @@ export default function EditorPage({
                       <div>
                         <label className="text-[10px] font-medium text-stone-400 mb-1 block">Ukuran cetak</label>
                         <select
+                          aria-label="Ukuran cetak"
                           className={cn(fieldClass, "w-full")}
                           value={project.printSize || "Size A (23x34cm)"}
                           onChange={(e) => setProject({...project, printSize: e.target.value as "Size A (23x34cm)" | "Size B (17x23cm)"})}
@@ -992,6 +1004,7 @@ export default function EditorPage({
                       <div>
                         <label className="text-[10px] font-medium text-stone-400 mb-1 block">Metode cetak</label>
                         <select
+                          aria-label="Metode cetak"
                           className={cn(fieldClass, "w-full")}
                           value={project.printMethod || "Embos Foil"}
                           onChange={(e) => {
@@ -1034,11 +1047,11 @@ export default function EditorPage({
                   <>
                     {/* Object actions: layer, duplicate, delete */}
                     <div className="py-3 flex items-center justify-between gap-1">
-                      <IconButton size="sm" onClick={() => changeLayer('front')} title="To Front"><BringToFront size={14}/></IconButton>
-                      <IconButton size="sm" onClick={() => changeLayer('back')} title="To Back"><SendToBack size={14}/></IconButton>
+                      <IconButton size="sm" onClick={() => changeLayer('front')} title="Bawa ke depan"><BringToFront size={14}/></IconButton>
+                      <IconButton size="sm" onClick={() => changeLayer('back')} title="Kirim ke belakang"><SendToBack size={14}/></IconButton>
                       <div className="w-px h-5 bg-stone-200" />
-                      <IconButton size="sm" onClick={duplicateSelected} title="Duplicate (Ctrl+D)"><Copy size={14}/></IconButton>
-                      <IconButton size="sm" variant="destructive" onClick={deleteSelected} title="Delete"><Trash2 size={14}/></IconButton>
+                      <IconButton size="sm" onClick={duplicateSelected} title="Gandakan (Ctrl+D)"><Copy size={14}/></IconButton>
+                      <IconButton size="sm" variant="destructive" onClick={deleteSelected} title="Hapus (Delete)"><Trash2 size={14}/></IconButton>
                     </div>
 
                     {/* Position & Size + Align */}
@@ -1047,20 +1060,20 @@ export default function EditorPage({
                       <div className="grid grid-cols-2 gap-2 mb-2">
                         <div>
                           <label className="text-[10px] font-medium text-stone-400 mb-1 block">X</label>
-                          <input type="number" value={selectedEl.x} onChange={(e) => updateNumericField(selectedEl.id, "x", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
+                          <input type="number" aria-label="Posisi X (persen)" value={selectedEl.x} onChange={(e) => updateNumericField(selectedEl.id, "x", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                         </div>
                         <div>
                           <label className="text-[10px] font-medium text-stone-400 mb-1 block">Y</label>
-                          <input type="number" value={selectedEl.y} onChange={(e) => updateNumericField(selectedEl.id, "y", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
+                          <input type="number" aria-label="Posisi Y (persen)" value={selectedEl.y} onChange={(e) => updateNumericField(selectedEl.id, "y", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                         </div>
                         <div>
                           <label className="text-[10px] font-medium text-stone-400 mb-1 block">Lebar</label>
-                          <input type="number" value={selectedEl.width} onChange={(e) => updateNumericField(selectedEl.id, "width", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
+                          <input type="number" aria-label="Lebar (persen)" value={selectedEl.width} onChange={(e) => updateNumericField(selectedEl.id, "width", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                         </div>
                         {selectedEl.type !== 'text' && (
                           <div>
                             <label className="text-[10px] font-medium text-stone-400 mb-1 block">Tinggi</label>
-                            <input type="number" value={selectedEl.height} onChange={(e) => updateNumericField(selectedEl.id, "height", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
+                            <input type="number" aria-label="Tinggi (persen)" value={selectedEl.height} onChange={(e) => updateNumericField(selectedEl.id, "height", e.target.value)} onBlur={commitHistory} className={cn(fieldClass, "w-full")} />
                           </div>
                         )}
                       </div>
@@ -1099,6 +1112,7 @@ export default function EditorPage({
                         </p>
                         <div className="space-y-2">
                           <select
+                            aria-label="Jenis font"
                             className={cn(fieldClass, "w-full")}
                             value={selectedEl.fontFamily || "Times New Roman"}
                             onChange={(e) => commitUpdate(selectedId!, { fontFamily: e.target.value })}
@@ -1109,6 +1123,7 @@ export default function EditorPage({
                           </select>
                           <input
                             type="text"
+                            aria-label="Isi teks"
                             className={cn(fieldClass, "w-full")}
                             value={selectedEl.text || ""}
                             onChange={(e) =>
@@ -1130,6 +1145,7 @@ export default function EditorPage({
                             <label className="text-[10px] font-medium text-stone-400 mb-1 block">Ukuran font</label>
                             <input
                               type="number"
+                              aria-label="Ukuran font"
                               list="font-sizes"
                               className={cn(fieldClass, "w-full")}
                               value={selectedEl.fontSize || 14}
@@ -1171,8 +1187,8 @@ export default function EditorPage({
                           <div className="w-8 h-8 rounded-md border-2 border-amber-500 flex items-center justify-center font-bold text-[9px] text-white" style={{background: "linear-gradient(135deg, #FFD700, #DAA520)"}} title="Emas Foil">Emas</div>
                         ) : (
                           <>
-                            <div onClick={() => commitUpdate(selectedId!, { color: "#FFFFFF" })} className={cn("w-8 h-8 rounded-md border-2 cursor-pointer", selectedEl.color === "#FFFFFF" ? "border-accent-600" : "border-stone-300")} style={{backgroundColor: "#FFFFFF"}} title="Putih"></div>
-                            <div onClick={() => commitUpdate(selectedId!, { color: "#111111" })} className={cn("w-8 h-8 rounded-md border-2 cursor-pointer", selectedEl.color === "#111111" ? "border-accent-600" : "border-stone-300")} style={{backgroundColor: "#111111"}} title="Hitam"></div>
+                            <button type="button" onClick={() => commitUpdate(selectedId!, { color: "#FFFFFF" })} aria-pressed={selectedEl.color === "#FFFFFF"} aria-label="Warna putih" className={cn("w-8 h-8 rounded-md border-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600", selectedEl.color === "#FFFFFF" ? "border-accent-600" : "border-stone-300")} style={{backgroundColor: "#FFFFFF"}} title="Putih"></button>
+                            <button type="button" onClick={() => commitUpdate(selectedId!, { color: "#111111" })} aria-pressed={selectedEl.color === "#111111"} aria-label="Warna hitam" className={cn("w-8 h-8 rounded-md border-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600", selectedEl.color === "#111111" ? "border-accent-600" : "border-stone-300")} style={{backgroundColor: "#111111"}} title="Hitam"></button>
                           </>
                         )}
                       </div>
@@ -1187,7 +1203,7 @@ export default function EditorPage({
             {activeDocker === 'elements' && (
               <>
                 <div className="py-3">
-                  <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]"><TypeIcon size={13}/> Text presets</p>
+                  <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]"><TypeIcon size={13}/> Gaya teks</p>
                   <div className="space-y-1">
                     <button onClick={() => addElement('text', {text: 'NAMA SEKOLAH', fontSize: 43, fontWeight: 'bold', width: 80, align: 'center'})} className="w-full text-left px-2.5 py-2 border border-transparent hover:border-accent-200 hover:bg-accent-50/60 rounded-sm transition cursor-pointer">
                       <span className="font-bold text-[13px]">Teks Judul Besar</span>
@@ -1205,7 +1221,7 @@ export default function EditorPage({
                 </div>
 
                 <div className="py-3">
-                  <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]"><ImageIcon size={13}/> Gambar & vector</p>
+                  <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]"><ImageIcon size={13}/> Gambar & vektor</p>
 
                   <div className="space-y-1.5">
                     <Button
@@ -1215,7 +1231,7 @@ export default function EditorPage({
                       onClick={() => imageInputRef.current?.click()}
                     >
                       <Download size={14} className="text-accent-600" />
-                      <span>Import Gambar Biasa</span>
+                      <span>Impor gambar</span>
                     </Button>
                     <input
                       type="file"
@@ -1237,14 +1253,14 @@ export default function EditorPage({
                       onClick={() => setShowVectorConverter(true)}
                     >
                       <Wand2 size={14} className="text-accent-600" />
-                      <span>Tracing ke Vector (B&W)</span>
+                      <span>Tracing logo ke vektor</span>
                     </Button>
                   </div>
-                  <p className="text-[10px] text-stone-400 mt-2 leading-tight text-center">Tips: Anda juga bisa Drag & Drop file langsung ke kanvas.</p>
+                  <p className="text-[10px] text-stone-400 mt-2 leading-tight text-center">Tips: seret berkas gambar langsung ke kanvas.</p>
                 </div>
 
                 <div className="py-3">
-                  <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]"><Sparkles size={13}/> Stamps & icons</p>
+                  <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]"><Sparkles size={13}/> Stempel & ikon</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {LOGO_ICON_NAMES.map((icon) => (
                       <button key={icon} onClick={() => addElement('logo', {logoIcon: icon, width: 15, height: 15})} className="flex flex-col items-center p-2.5 border border-stone-200 hover:border-accent-300 hover:bg-accent-50/60 rounded-sm transition cursor-pointer">
@@ -1269,12 +1285,14 @@ export default function EditorPage({
       {showVectorConverter && (
         <ImageToVectorConverter
           onClose={() => setShowVectorConverter(false)}
-          onInsertSVG={(svgString) => {
+          onInsertSVG={(svgString, size) => {
+            // Kotak elemen mengikuti rasio logo (maks. 30% lebar / 40% tinggi), bukan persegi tetap.
+            const box = computeImageImportSize(size.width, size.height, getCardRatio(project.printSize));
             addElement('custom_svg', {
               customSvg: svgString,
               color: project.printMethod === "Sablon" ? "#111111" : "#D4AF37",
-              width: 30,
-              height: 30,
+              width: box.width,
+              height: box.height,
             });
           }}
         />

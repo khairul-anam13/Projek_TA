@@ -25,7 +25,7 @@ SQL: `supabase/schema.sql`, `supabase/assets_schema.sql` (bucket storage `user_a
 
 ## Stack
 
-Next.js 15 App Router, React 19, Tailwind 4, Supabase (Google OAuth, Postgres + RLS, Storage), Groq `openai/gpt-oss-20b`, jspdf (hanya untuk PDF), `@imgly/background-removal` + `@cadit-app/potrace-ts` (trace logo ke SVG B&W), `motion`, vitest.
+Next.js 15 App Router, React 19, Tailwind 4, Supabase (Google OAuth, Postgres + RLS, Storage), Groq `openai/gpt-oss-20b`, jspdf (hanya untuk PDF), `@cadit-app/potrace-ts` (trace logo ke SVG satu tinta), `@imgly/background-removal` (opsional, hapus latar AI untuk foto), `motion`, vitest.
 
 Alias import: `@/*` → root proyek.
 
@@ -51,6 +51,7 @@ Alias import: `@/*` → root proyek.
 | Ekspor vektor | `lib/vectorExport.ts` | `buildScene` → `sceneToSvg` / `sceneToPdf`; mm ukuran asli, artwork saja |
 | Batch CSV | `lib/csv.ts`, `lib/batch.ts`, `lib/zip.ts`, `components/BatchPage.tsx` | `parseCsv` (RFC 4180, auto `,`/`;`, baris kosong dipertahankan agar indeks = baris spreadsheet) → `parseBatchCsv` (header toleran, kolom wajib `judulRapor/namaSekolah/alamatSekolah/subInformasi`, `mockupType` opsional; baris salah masuk `errors`, tidak menghentikan baris lain) → `buildBatchCover` (template + `buildScene` + `runPreflight` + byte PDF/SVG) / `runBatch` (bertahap, `setTimeout(0)` per baris) → `zipStore` (ZIP tanpa kompresi, tanpa dependensi). `namaSekolah` kosong = baris dilewati; alamat/sub informasi kosong = elemen terikat dihapus (bukan placeholder); judul kosong = judul bawaan. Nama berkas `NNN_Nama_Sekolah.pdf/.svg` (NNN = nomor baris spreadsheet). CSV contoh: `public/contoh-batch.csv` |
 | Utilitas SVG | `lib/svgUtils.ts` | `parsePath`, `parseCustomSvg` (menjamin viewBox hasil potrace), `customSvgMarkup` |
+| Trace logo | `lib/logoTrace.ts`, `components/ImageToVectorConverter.tsx` | Pipeline murni: `workingSize` (sisi panjang 640–1000 px) → blur peredam derau → latar = median bingkai tepi → mask tinta → potong ke bbox → potrace → SVG berviewBox `0 0 w h` (satu `<path>` evenodd). Tiga mode: `detail` (Otsu tonal hanya dari piksel bukan-latar, sisi tinta otomatis menjauhi luminans latar), `siluet` (jarak warna dari latar), `garis` (Sobel per kanal → kerangka Zhang-Suen → tebal seragam; komponen tonal yang tipis seluruhnya, mis. huruf, tetap padat). `suggestMode` memilih bawaan (berwarna → garis). UI: pratinjau langsung, slider ambang/bintik/derau/tebal garis, "Balik", opsi AI hapus-latar (dynamic import, mati secara bawaan). Aset disimpan ke `user_assets` hanya saat "Gunakan di kanvas". Elemen disisipkan dengan rasio logo (`computeImageImportSize`) |
 | Ikon logo | `lib/logoIcons.ts` | Satu sumber path ikon untuk editor, preview, PNG, vektor |
 | Layout teks | `lib/textLayout.ts` | Wrap + shrink-to-fit (binary search). Kata tunggal terlalu lebar terus mengecil, bukan dipotong "…" (kecuali sudah di ukuran minimum) |
 | Tekstur bahan | `lib/materialTexture.ts` | Parameter SVG filter dipakai on-screen DAN ekspor PNG |
@@ -63,8 +64,8 @@ Alias import: `@/*` → root proyek.
 | Preview/ekspor | `components/PreviewPage.tsx` | Kartu cek siap cetak; PDF/SVG vektor; PNG/PDF raster pratinjau (`generateHighResFile`) |
 | Galeri template | `components/CreateProjectPage.tsx` | Pilihan ukuran A/B + kartu template berpratinjau data sendiri |
 | Teks SVG | `components/CanvasFitText.tsx` | Render `lines` hasil `computeFitLayout` persis, tanpa word-wrap browser |
-| UI kit | `components/ui/*` | `Button`, `IconButton`, `Card`, `Badge`, `Input`, `PageHeader` (cva + `cn`) |
-| Harness QA | `app/qa-test/page.tsx` | Dev-only: semua template × ukuran (pratinjau vs ekspor vektor), form create, batch CSV, editor, preview |
+| UI kit | `components/ui/*` | `Button`, `IconButton` (title otomatis jadi aria-label), `Card`, `Badge`, `Input`, `PageHeader`, `ConfirmDialog` (pengganti `window.confirm`; hapus proyek lewat `lib/useDeleteProject.tsx`) |
+| Harness QA | `app/qa-test/page.tsx` | Dev-only: semua template × ukuran (pratinjau vs ekspor vektor), form create, batch CSV, dashboard & riwayat (data contoh + dialog hapus), editor, preview |
 
 ## Aturan bisnis yang tidak boleh rusak
 
@@ -92,9 +93,9 @@ Tambah objek di `TEMPLATES` (`lib/templates.ts`) dengan `build(ctx)` memakai `to
 
 ## Masalah yang sudah diketahui (belum diperbaiki)
 
-- Docs/README/teks UI masih menyebut Gemini; kode memakai Groq. Route `/api/gemini*` hanya nama warisan.
+- Docs/README masih menyebut Gemini; kode memakai Groq (teks UI sudah dinetralkan). Route `/api/gemini*` hanya nama warisan.
 - Belum ada rate limit pada `/api/gemini*` (user login masih bisa menghabiskan kuota Groq).
-- Tooltip Save menulis "Ctrl+S" tetapi tidak ada handler-nya. Undo/redo tidak dibatasi 50 langkah seperti klaim README.
+- Undo/redo tidak dibatasi 50 langkah seperti klaim README.
 - `commitHistory`/`commitUpdate` memanggil `pushHistory` di dalam updater `setProject` (rawan dobel di StrictMode dev; belum diverifikasi).
 - Teks di ekspor vektor belum dikonversi ke kurva; font hanya Times New Roman/Arial (belum ada pustaka font, belum ada Arab untuk madrasah).
 - Ambang preflight (margin 8 mm, font minimum 7 pt) adalah asumsi awal; konfirmasi ke percetakan.
@@ -102,3 +103,5 @@ Tambah objek di `TEMPLATES` (`lib/templates.ts`) dengan `build(ctx)` memakai `to
 - `app/qa-test/page.tsx` punya error lint lama (`setMounted` di effect).
 - Batch CSV dibaca sebagai UTF-8 (CSV ANSI/Windows-1252 dari Excel merusak karakter non-ASCII); baris dengan temuan preflight tetap ikut ZIP (hanya ditandai di tabel); tanpa pratinjau gambar per sekolah.
 - Aset `user_assets` (hasil tracing) tersimpan tetapi belum ada UI untuk memakainya ulang.
+- Trace logo: gradasi besar pada mode `detail` tetap terpotong di satu ambang (pakai `garis`/`siluet`); teks logo sangat kecil (< ±1 mm pada ukuran cetak) hilang atau pecah di semua mode; tebal garis `garis` memakai piksel kerja, belum dikonversi ke mm sesuai ukuran elemen di kanvas; hasil belum dipratinjau dengan warna tinta metode cetak.
+- Vitest meng-inline `@cadit-app/potrace-ts` (`vitest.config.ts`) karena import relatif tanpa ekstensi; muncul peringatan "Sourcemap ... missing source files" yang tidak berbahaya.

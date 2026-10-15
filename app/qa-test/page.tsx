@@ -5,6 +5,9 @@ import PreviewPage from "@/components/PreviewPage";
 import EditorPage from "@/components/EditorPage";
 import CreateProjectPage from "@/components/CreateProjectPage";
 import BatchPage from "@/components/BatchPage";
+import DashboardPage from "@/components/DashboardPage";
+import HistoryPage from "@/components/HistoryPage";
+import { ConfirmDialog } from "@/components/ui";
 import { getMockupTemplate } from "@/lib/mockupTemplates";
 import { drawTextInBox } from "@/lib/textLayout";
 import { DesignProject, PrintSize } from "@/lib/types";
@@ -153,8 +156,32 @@ function ExportCanvasPreview({ project }: { project: DesignProject }) {
   return <canvas ref={canvasRef} style={{ width: 400, border: "1px solid #ccc" }} />;
 }
 
+const QA_SCHOOLS = ["SMKN 2 Karanganyar", "SDN Harapan Bangsa 3", "MAN 1 Surakarta", "SMPN 4 Sragen", "SMAN 1 Boyolali", "SD Islam Al-Hikmah"];
+
+/** Contoh daftar proyek untuk Dashboard/Riwayat (pratinjau kartu memakai desain asli). */
+function sampleProjects(): DesignProject[] {
+  return QA_SCHOOLS.map((nama, i) => {
+    const tpl = COVER_TEMPLATES[i % COVER_TEMPLATES.length];
+    const base = buildTemplatePreviewProject(tpl.id, {
+      data: { ...QA_DATA, namaSekolah: nama },
+      mockupType: "Rapor SMA/SMK",
+      printSize: i % 3 === 2 ? "Size B (17x23cm)" : "Size A (23x34cm)",
+    });
+    return {
+      ...base,
+      id: `qa_p${i}`,
+      name: nama.toUpperCase(),
+      mockupType: "Rapor SMA/SMK",
+      category: "Sekolah",
+      status: i % 2 === 0 ? "Final" : "Draft",
+      createdAt: new Date(2026, 9, 14 - i * 3).toISOString(),
+    };
+  });
+}
+
 export default function QaPage() {
   const [project] = useState(longProject);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   // Halaman editor/preview asli selalu menunggu fetch data client-side dulu
   // (lihat app/(app)/editor/[id]/page.tsx: layar "Memuat proyek...") sebelum
   // me-mount EditorPage/PreviewPage, jadi elemen teksnya tidak pernah ikut
@@ -194,6 +221,38 @@ export default function QaPage() {
       </div>
       <div id="batch-qa" style={{ borderBottom: "1px solid #ccc" }}>
         <BatchPage onBack={() => {}} />
+      </div>
+      <div id="dashboard-qa" style={{ borderBottom: "1px solid #ccc" }}>
+        <DashboardPage
+          userEmail="operator@percetakan.id"
+          userName="Dewi Lestari"
+          projects={sampleProjects()}
+          onCreateProject={() => {}}
+          onEditProject={() => {}}
+          onPreviewProject={() => {}}
+          onDeleteProject={setDeleteId}
+          onViewHistory={() => {}}
+          onBatch={() => {}}
+          onLogout={() => {}}
+        />
+      </div>
+      <ConfirmDialog
+        open={deleteId !== null}
+        destructive
+        title="Hapus desain ini?"
+        message="Contoh dialog konfirmasi hapus (data contoh, tidak ada yang dihapus)."
+        confirmLabel="Hapus"
+        onConfirm={() => setDeleteId(null)}
+        onCancel={() => setDeleteId(null)}
+      />
+      <div id="history-qa" style={{ borderBottom: "1px solid #ccc" }}>
+        <HistoryPage
+          projects={sampleProjects()}
+          onBack={() => {}}
+          onEditProject={() => {}}
+          onPreviewProject={() => {}}
+          onDeleteProject={() => {}}
+        />
       </div>
       <div style={{ padding: 24, display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div>

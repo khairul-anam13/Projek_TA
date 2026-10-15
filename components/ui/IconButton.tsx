@@ -27,7 +27,14 @@ export interface IconButtonProps
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
   ({ className, variant, size, ...props }, ref) => (
-    <button ref={ref} className={cn(iconButtonVariants({ variant, size }), className)} {...props} />
+    // Tombol ikon tak punya teks: pakai title sebagai nama aksesibel bila aria-label tak diberikan.
+    <button
+      ref={ref}
+      type="button"
+      aria-label={props["aria-label"] ?? props.title}
+      className={cn(iconButtonVariants({ variant, size }), className)}
+      {...props}
+    />
   )
 );
 IconButton.displayName = "IconButton";

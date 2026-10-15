@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion } from "motion/react";
+import { motion, MotionConfig } from "motion/react";
 import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui";
@@ -31,6 +31,7 @@ export default function LoginPage() {
   };
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen grid lg:grid-cols-12 bg-canvas text-stone-900" id="login-layout">
       {/* Left Column: Form Panel */}
       <div className="lg:col-span-5 flex flex-col justify-between p-8 sm:p-12 lg:p-16 bg-surface shadow-xl z-10" id="login-sidebar">
@@ -43,8 +44,8 @@ export default function LoginPage() {
             <span className="font-extrabold text-xl tracking-tight text-stone-900">
               Page <span className="text-brand-600">Free</span>
             </span>
-            <span className="block text-[10px] text-stone-400 tracking-wider uppercase font-bold">
-              AI-Powered Print Station
+            <span className="block text-[11px] text-stone-500 font-medium">
+              Studio Desain Cetak
             </span>
           </div>
         </div>
@@ -61,7 +62,7 @@ export default function LoginPage() {
                 Selamat datang
               </h1>
               <p className="text-stone-500 mt-2 text-sm">
-                Masuk dengan akun Google Anda untuk mulai mengonsep, menyusun, dan mencetak desain profesional dengan panduan AI.
+                Masuk dengan akun Google untuk membuat sampul rapor siap cetak: pilih template, isi data sekolah, lalu ekspor file vektor untuk klise.
               </p>
             </div>
 
@@ -105,28 +106,24 @@ export default function LoginPage() {
             </Button>
 
             <div className="mt-6 text-center">
-              <p className="text-xs text-stone-400 leading-relaxed">
-                Dengan masuk, Anda menyetujui{" "}
-                <span className="text-brand-600 font-medium">Syarat & Ketentuan</span>{" "}
-                dan{" "}
-                <span className="text-brand-600 font-medium">Kebijakan Privasi</span>{" "}
-                Page Free.
+              <p className="text-xs text-stone-500 leading-relaxed">
+                Dengan masuk, Anda menyetujui syarat penggunaan dan kebijakan privasi Page Free.
               </p>
             </div>
           </motion.div>
 
           {/* Quick Info */}
           <div className="mt-10 pt-6 border-t border-stone-100" id="feature-highlights">
-            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3 text-center">Mengapa Page Free?</p>
+            <p className="text-xs font-semibold text-stone-600 mb-3">Untuk operator percetakan</p>
             <div className="space-y-2.5">
               {[
-                "Rekomendasi warna & tipografi otomatis dari Gemini AI",
-                "Proyek tersimpan aman di cloud — akses dari mana saja",
-                "Editor kanvas interaktif siap pakai tanpa coding",
+                "Template sampul rapor ukuran A (23×34 cm) dan B (17×23 cm)",
+                "Cek siap cetak: jendela mika, margin aman, warna tinta",
+                "Ekspor PDF/SVG vektor ukuran asli, atau banyak sekolah sekaligus dari CSV",
               ].map((feat) => (
                 <div key={feat} className="flex items-start gap-2">
                   <Sparkles className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
-                  <span className="text-xs text-stone-500">{feat}</span>
+                  <span className="text-xs text-stone-600 leading-relaxed">{feat}</span>
                 </div>
               ))}
             </div>
@@ -135,7 +132,7 @@ export default function LoginPage() {
 
         {/* Footer info */}
         <div className="text-center lg:text-left" id="login-footer">
-          <p className="text-xs text-stone-400">
+          <p className="text-xs text-stone-500">
             Page Free v2.0.0 — © 2026 PT Kreatif Percetakan Indonesia
           </p>
         </div>
@@ -156,54 +153,19 @@ export default function LoginPage() {
               transition={{ duration: 0.8 }}
               className="mb-8 relative inline-block"
             >
-              {/* Symbolic Printer Plate Floating item */}
-              <div className="w-64 h-40 bg-gradient-to-tr from-brand-600 to-teal-500 rounded-2xl shadow-2xl relative border border-brand-400/30 flex items-center justify-center overflow-hidden mx-auto">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.1),transparent)]" />
-
-                {/* Paper feeds in */}
-                <motion.div
-                  className="absolute bottom-4 left-6 right-6 h-28 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 p-3 overflow-hidden flex flex-col justify-between"
-                  animate={{ y: [15, -5, 15] }}
-                  transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="w-12 h-2.5 bg-brand-400/50 rounded-full" />
-                    <Sparkles className="w-4 h-4 text-amber-300" />
-                  </div>
-                  <div className="space-y-1.5 py-2">
-                    <span className="block w-full h-1.5 bg-white/40 rounded-full" />
-                    <span className="block w-4/5 h-1.5 bg-white/30 rounded-full" />
-                    <span className="block w-2/3 h-1.5 bg-white/20 rounded-full" />
-                  </div>
-                </motion.div>
-
-                {/* Laser scan line */}
-                <motion.div
-                  className="absolute left-0 right-0 h-[3px] bg-cyan-300 shadow-lg shadow-cyan-200"
-                  animate={{ top: ["10%", "90%", "10%"] }}
-                  transition={{ repeat: Infinity, duration: 3.5, ease: "linear" }}
-                />
-              </div>
-
-              {/* Smaller business card floating on top */}
+              {/* Sampul rapor: kartu gelap, teks emas foil, jendela mika nama */}
               <motion.div
-                className="absolute -bottom-6 -right-8 w-44 h-24 bg-white text-stone-900 rounded-xl shadow-2xl p-3 flex flex-col justify-between border border-stone-100"
-                initial={{ rotate: 10, scale: 0.9 }}
-                animate={{ y: [0, -10, 0], rotate: [10, 8, 10] }}
-                transition={{ repeat: Infinity, duration: 5, ease: "easeInOut", delay: 1 }}
+                aria-hidden="true"
+                className="relative mx-auto flex h-72 w-48 flex-col items-center rounded-xl border border-white/10 bg-stone-950 px-5 pt-8 shadow-2xl"
+                animate={{ y: [0, -8, 0] }}
+                transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
               >
-                <div className="flex justify-between items-center">
-                  <span className="text-[9px] font-extrabold tracking-wider text-brand-600">CREATIVE CARD</span>
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                </div>
-                <div>
-                  <span className="block text-[11px] font-bold text-stone-800">Dian Sastrowardoyo</span>
-                  <span className="block text-[7px] text-stone-400">Head of Fashion Curation</span>
-                </div>
-                <div className="flex justify-between items-center text-[6px] text-stone-400">
-                  <span>☏ +62 811-9233</span>
-                  <span>🌐 fashion.studio</span>
-                </div>
+                <span className="text-[11px] font-bold tracking-wide text-amber-300">RAPOR PESERTA DIDIK</span>
+                <span className="mt-4 h-9 w-9 rounded-full border-2 border-amber-300/80" />
+                <span className="mt-4 text-sm font-bold text-amber-300">NAMA SEKOLAH</span>
+                <span className="mt-2 h-1 w-24 rounded-full bg-amber-300/40" />
+                <span className="mt-1.5 h-1 w-20 rounded-full bg-amber-300/30" />
+                <span className="absolute bottom-10 left-5 right-5 h-12 rounded-md border border-white/25 bg-white/15" />
               </motion.div>
             </motion.div>
 
@@ -213,22 +175,17 @@ export default function LoginPage() {
               transition={{ delay: 0.4, duration: 0.8 }}
               className="mt-6"
             >
-              <h2 className="text-2xl font-bold tracking-tight">
-                Kreativitas Canva. Kepresisian Figma.
+              <h2 className="text-2xl font-bold tracking-tight text-balance">
+                Sampul rapor siap cetak, tanpa tebak-tebakan.
               </h2>
-              <p className="text-stone-300 mt-3 text-sm leading-relaxed max-w-sm mx-auto">
-                Rancang kebutuhan percetakan dalam sekejap. Rekomendasi palet warna, tipografi, dan slogan otomatis terintegrasi dari Gemini AI.
+              <p className="text-stone-300 mt-3 text-sm leading-relaxed max-w-sm mx-auto text-balance">
+                Data sekolah terisi dari sumber resmi, tata letak mengikuti ukuran mika, dan hasilnya berupa file vektor yang siap dibuat klise foil atau sablon.
               </p>
             </motion.div>
           </div>
         </div>
-
-        {/* Small badge */}
-        <div className="absolute bottom-8 right-8 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/60 text-[10px] tracking-wider">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-          <span>SUPABASE AUTH ACTIVE</span>
-        </div>
       </div>
     </div>
+    </MotionConfig>
   );
 }

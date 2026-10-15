@@ -49,7 +49,7 @@ export const PRODUCT_CATALOG: ProductCatalogItem[] = [
     type: "Sampul Rapor",
     label: "Sampul Rapor",
     description: "Sampul buku laporan / rapor sekolah dengan desain elegan dan profesional.",
-    dimension: "A4 (210 × 297 mm)",
+    dimension: "A 23×34 cm, B 17×23 cm",
     icon: "📄",
     available: true,
   },
