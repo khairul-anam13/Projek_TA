@@ -14,6 +14,8 @@ import {
   MIN_ELEMENT_SIZE,
   MIKA_ZONE_MIN,
   MIKA_ZONE_MAX,
+  getMikaRect,
+  getMikaZone,
 } from "../canvasConstraints";
 
 describe("clampToCanvas (Boundary Value Analysis)", () => {
@@ -408,5 +410,61 @@ describe("computeResize (resize elemen lewat 8 handle, sisi berlawanan tetap anc
   it("elemen Kunci Sumbu X TIDAK direcenter saat resize vertikal murni ('s')", () => {
     const r = computeResize(base, "s", 0, 10, true);
     expect(r.x).toBe(base.x);
+  });
+});
+
+describe("getMikaRect / getMikaZone (mika fisik 13x4,5 cm, tepi bawah 7 cm dari bawah, rata tengah)", () => {
+  it("Size A (23x34): kiri 5 cm, tepi atas 22,5 cm dari atas", () => {
+    const r = getMikaRect("Size A (23x34cm)");
+    expect(r.x).toBeCloseTo((5 / 23) * 100, 6);
+    expect(r.y).toBeCloseTo((22.5 / 34) * 100, 6);
+    expect(r.width).toBeCloseTo((13 / 23) * 100, 6);
+    expect(r.height).toBeCloseTo((4.5 / 34) * 100, 6);
+  });
+
+  it("Size B (17x23): kiri 2 cm, tepi atas 11,5 cm dari atas", () => {
+    const r = getMikaRect("Size B (17x23cm)");
+    expect(r.x).toBeCloseTo((2 / 17) * 100, 6);
+    expect(r.y).toBeCloseTo(50, 6);
+    expect(r.height).toBeCloseTo((4.5 / 23) * 100, 6);
+  });
+
+  it("tanpa ukuran = Size A; zona = rentang Y mika", () => {
+    expect(getMikaRect(undefined)).toEqual(getMikaRect("Size A (23x34cm)"));
+    const z = getMikaZone("Size B (17x23cm)");
+    expect(z.min).toBeCloseTo(50, 6);
+    expect(z.max).toBeCloseTo(50 + (4.5 / 23) * 100, 6);
+  });
+
+  it("zona fisik selalu berada di dalam zona konservatif lama 50-80", () => {
+    for (const size of ["Size A (23x34cm)", "Size B (17x23cm)"] as const) {
+      const z = getMikaZone(size);
+      expect(z.min).toBeGreaterThanOrEqual(MIKA_ZONE_MIN);
+      expect(z.max).toBeLessThanOrEqual(MIKA_ZONE_MAX);
+    }
+  });
+});
+
+describe("enforceMikaConstraint dengan tinggi elemen & zona per ukuran", () => {
+  const zoneA = getMikaZone("Size A (23x34cm)");
+  const zoneB = getMikaZone("Size B (17x23cm)");
+
+  it("teks tinggi 10 yang bawahnya menyentuh mika didorong ke atas (bawah elemen = zona.min - 1)", () => {
+    const y = enforceMikaConstraint("text", 60, 10, zoneA);
+    expect(y + 10).toBeCloseTo(zoneA.min - 1, 6);
+  });
+
+  it("area 50-66 yang dulu terblokir kini bebas di Size A, tapi tetap terlarang di Size B", () => {
+    expect(enforceMikaConstraint("text", 55, 5, zoneA)).toBe(55);
+    expect(enforceMikaConstraint("text", 55, 5, zoneB)).not.toBe(55);
+  });
+
+  it("elemen di paruh bawah zona didorong ke bawah zona (zona.max + 1)", () => {
+    expect(enforceMikaConstraint("text", 75, 4, zoneA)).toBeCloseTo(zoneA.max + 1, 6);
+  });
+
+  it("tanpa height/zone perilaku lama tidak berubah", () => {
+    expect(enforceMikaConstraint("text", 64)).toBe(49);
+    expect(enforceMikaConstraint("text", 65)).toBe(81);
   });
 });

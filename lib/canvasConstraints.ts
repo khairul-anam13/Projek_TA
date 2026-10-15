@@ -1,4 +1,4 @@
-import { CanvasElement, DesignProject } from "./types";
+import { CanvasElement, DesignProject, PrintSize } from "./types";
 
 /**
  * Aturan bisnis penempatan elemen pada kanvas editor (drag, snap, dan
@@ -134,15 +134,61 @@ export function applySmartSnap(
   return { x: xRes.value, y: yRes.value, guides };
 }
 
+/** Ukuran fisik sampul (cm) per pilihan ukuran cetak. */
+export const PRINT_SIZE_CM = {
+  "Size A (23x34cm)": { width: 23, height: 34 },
+  "Size B (17x23cm)": { width: 17, height: 23 },
+} as const;
+
+export function getPrintSizeCm(printSize?: PrintSize): { width: number; height: number } {
+  return PRINT_SIZE_CM[printSize ?? "Size A (23x34cm)"];
+}
+
+// Mika nama fisik: 13 x 4,5 cm, tepi bawahnya 7 cm dari bawah sampul, dan
+// rata tengah horizontal (Size A: 5 cm kiri-kanan; Size B: 2 cm kiri-kanan).
+const MIKA_CM = { width: 13, height: 4.5, bottomOffset: 7 };
+
+/** Posisi & ukuran mika nama pada kanvas (persen), dihitung dari ukuran fisik. */
+export function getMikaRect(printSize?: PrintSize): Rect {
+  const { width: w, height: h } = getPrintSizeCm(printSize);
+  return {
+    x: ((w - MIKA_CM.width) / 2 / w) * 100,
+    y: ((h - MIKA_CM.bottomOffset - MIKA_CM.height) / h) * 100,
+    width: (MIKA_CM.width / w) * 100,
+    height: (MIKA_CM.height / h) * 100,
+  };
+}
+
+export interface MikaZone {
+  min: number;
+  max: number;
+}
+
+/** Zona konservatif lama (Y 50-80) yang aman untuk kedua ukuran; dipakai layout AI. */
+export const DEFAULT_MIKA_ZONE: MikaZone = { min: MIKA_ZONE_MIN, max: MIKA_ZONE_MAX };
+
+/** Rentang Y mika yang sebenarnya untuk ukuran cetak tertentu (persen). */
+export function getMikaZone(printSize?: PrintSize): MikaZone {
+  const r = getMikaRect(printSize);
+  return { min: r.y, max: r.y + r.height };
+}
+
 /**
- * Constraint Zona Mika: elemen teks tidak boleh diletakkan pada Y 50-80
- * (area fisik jendela mika nama). Elemen didorong keluar ke tepi terdekat.
+ * Constraint Zona Mika: elemen teks tidak boleh menutupi jendela mika nama.
+ * Tanpa argumen `height`/`zone` perilakunya sama seperti dulu (titik atas
+ * elemen tidak boleh di Y 50-80). Dengan `height` dan `zone` ukuran-spesifik
+ * (getMikaZone), seluruh tinggi elemen diperhitungkan. Elemen didorong keluar
+ * ke tepi terdekat.
  */
-export function enforceMikaConstraint(elementType: CanvasElement["type"] | undefined, ty: number): number {
-  if (elementType === "text" && ty >= MIKA_ZONE_MIN && ty <= MIKA_ZONE_MAX) {
-    return ty < MIKA_ZONE_SPLIT ? MIKA_ZONE_MIN - 1 : MIKA_ZONE_MAX + 1;
-  }
-  return ty;
+export function enforceMikaConstraint(
+  elementType: CanvasElement["type"] | undefined,
+  ty: number,
+  height: number = 0,
+  zone: MikaZone = DEFAULT_MIKA_ZONE
+): number {
+  if (elementType !== "text" || ty > zone.max || ty + height < zone.min) return ty;
+  const split = (zone.min + zone.max) / 2;
+  return ty + height / 2 < split ? Math.max(0, zone.min - 1 - height) : zone.max + 1;
 }
 
 export const OVERLAP_GAP = 1;

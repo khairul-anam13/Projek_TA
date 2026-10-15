@@ -169,10 +169,17 @@ export function fitTextInBox(
   const fontSize0 = Math.max(initialFontSize, MIN_FONT_SIZE);
   const maxSteps = Math.ceil(fontSize0 - MIN_FONT_SIZE);
 
+  // Kata tunggal yang lebih lebar dari kotak dipotong dengan "…" oleh
+  // wrapTextToLines. Itu bukan "muat": lebih baik terus mengecil sampai kata
+  // utuh muat (tetap monoton terhadap ukuran font, jadi binary search valid).
+  const userHasEllipsis = text.includes("…");
+
   const tryStep = (k: number) => {
     const fontSize = fontSize0 - k;
     const lines = wrapTextToLines(ctx, text, box.width, fontSize, fontFamily, fontWeight);
-    const fits = lines.length * fontSize * LINE_HEIGHT_RATIO <= box.height || fontSize <= MIN_FONT_SIZE;
+    const truncated = !userHasEllipsis && lines.some((l) => l.endsWith("…"));
+    const fits =
+      (!truncated && lines.length * fontSize * LINE_HEIGHT_RATIO <= box.height) || fontSize <= MIN_FONT_SIZE;
     return { fontSize, lines, fits };
   };
 

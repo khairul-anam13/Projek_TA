@@ -1,9 +1,13 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, ChevronRight, PenTool, Search, Loader2, CheckCircle2, AlertCircle, ListFilter } from "lucide-react";
-import { MockupType, ProductType } from "../lib/types";
+import { MockupType, PrintSize, ProductType } from "../lib/types";
 import { Button, Input, Textarea, PageHeader } from "@/components/ui";
+import { cn } from "@/lib/utils";
+import { getCardRatio } from "../lib/canvasConstraints";
+import { COVER_TEMPLATES, DEFAULT_TEMPLATE_ID, buildTemplatePreviewProject } from "../lib/templates";
+import { DesignCanvas } from "./DesignCanvas";
 
 const SEARCH_DEBOUNCE_MS = 400;
 const MIN_QUERY_LENGTH_FOR_AUTO_SEARCH = 3;
@@ -31,6 +35,8 @@ interface CreateProjectFormData {
     alamatSekolah: string;
     subInformasi: string;
   };
+  templateId?: string;
+  printSize?: PrintSize;
 }
 
 interface CreateProjectPageProps {
@@ -46,6 +52,13 @@ interface CreateProjectPageProps {
 
 const MOCKUPS: MockupType[] = ["Rapor SD", "Rapor SMP", "Rapor SMA/SMK", "Rapor MAN"];
 
+const PRINT_SIZES: { value: PrintSize; label: string; note: string }[] = [
+  { value: "Size A (23x34cm)", label: "Ukuran A", note: "23 × 34 cm" },
+  { value: "Size B (17x23cm)", label: "Ukuran B", note: "17 × 23 cm" },
+];
+
+const TEMPLATE_THUMB_WIDTH = 116;
+
 export default function CreateProjectPage({
   initialProductType,
   initialFormData,
@@ -60,6 +73,22 @@ export default function CreateProjectPage({
   const [namaSekolah, setNamaSekolah] = useState(initialFormData?.dynamicData.namaSekolah ?? "");
   const [alamatSekolah, setAlamatSekolah] = useState(initialFormData?.dynamicData.alamatSekolah ?? "");
   const [subInformasi, setSubInformasi] = useState(initialFormData?.dynamicData.subInformasi ?? "");
+  const [printSize, setPrintSize] = useState<PrintSize>(initialFormData?.printSize ?? "Size A (23x34cm)");
+  const [templateId, setTemplateId] = useState(initialFormData?.templateId ?? DEFAULT_TEMPLATE_ID);
+
+  // Pratinjau tiap template dengan data & ukuran yang sedang diisi.
+  const templatePreviews = useMemo(
+    () =>
+      COVER_TEMPLATES.map((template) => ({
+        template,
+        project: buildTemplatePreviewProject(template.id, {
+          data: { judulRapor, namaSekolah, alamatSekolah, subInformasi },
+          mockupType,
+          printSize,
+        }),
+      })),
+    [judulRapor, namaSekolah, alamatSekolah, subInformasi, mockupType, printSize]
+  );
 
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -187,6 +216,8 @@ export default function CreateProjectPage({
 
   const formData = {
     mockupType,
+    templateId,
+    printSize,
     dynamicData: {
       judulRapor,
       namaSekolah,
@@ -209,8 +240,8 @@ export default function CreateProjectPage({
     }
   };
 
-  const handleSubmitAi = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmitAi = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (isSubmitting) return;
     if (!handleValidation()) return;
 
@@ -280,7 +311,13 @@ export default function CreateProjectPage({
             </p>
           </div>
 
-          <form onSubmit={handleSubmitAi} className="p-8 space-y-8">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSkipAi();
+            }}
+            className="p-8 space-y-8"
+          >
             {error && (
               <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-3 text-rose-600 text-sm font-medium">
                 <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
@@ -305,6 +342,29 @@ export default function CreateProjectPage({
                     >
                       {m}
                     </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ukuran cetak */}
+              <div>
+                <label className="block text-sm font-bold text-stone-700 mb-2">Ukuran Cetak</label>
+                <div className="grid grid-cols-2 gap-3 max-w-md">
+                  {PRINT_SIZES.map((size) => (
+                    <button
+                      key={size.value}
+                      type="button"
+                      onClick={() => setPrintSize(size.value)}
+                      className={cn(
+                        "px-4 py-3 rounded-xl border-2 cursor-pointer transition text-center",
+                        printSize === size.value
+                          ? "border-brand-500 bg-brand-50 text-brand-700 shadow-sm"
+                          : "border-stone-200 text-stone-500 hover:border-stone-300 hover:bg-stone-50"
+                      )}
+                    >
+                      <span className="block text-sm font-semibold">{size.label}</span>
+                      <span className="block text-[11px] opacity-70">{size.note}</span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -444,33 +504,60 @@ export default function CreateProjectPage({
               </div>
             </div>
 
+            {/* Template sampul */}
+            <div>
+              <label className="block text-sm font-bold text-stone-700 mb-1">Template Sampul</label>
+              <p className="text-xs text-stone-400 mb-3">
+                Pratinjau memakai data sekolah dan ukuran cetak di atas. Posisi jendela mika sudah dihitung per ukuran.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" id="template-gallery">
+                {templatePreviews.map(({ template, project }) => {
+                  const selected = template.id === templateId;
+                  return (
+                    <button
+                      key={template.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setTemplateId(template.id)}
+                      className={cn(
+                        "text-left rounded-xl border-2 p-2.5 cursor-pointer transition",
+                        selected
+                          ? "border-brand-500 bg-brand-50 shadow-sm"
+                          : "border-stone-200 hover:border-stone-300 hover:bg-stone-50"
+                      )}
+                    >
+                      <div className="flex justify-center rounded-lg bg-stone-100 py-3 mb-2.5">
+                        <DesignCanvas
+                          project={project}
+                          width={TEMPLATE_THUMB_WIDTH}
+                          height={Math.round(TEMPLATE_THUMB_WIDTH / getCardRatio(printSize))}
+                          borderRadius={3}
+                        />
+                      </div>
+                      <p className="text-sm font-semibold text-stone-800">{template.nama}</p>
+                      <p className="text-[11px] leading-snug text-stone-400">{template.deskripsi}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Actions Block */}
             <div className="pt-6 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-end gap-3">
               <Button
                 type="button"
                 variant="secondary"
                 size="lg"
-                onClick={handleSkipAi}
+                onClick={() => handleSubmitAi()}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <PenTool className="w-4 h-4" />
-                )}
-                {isSubmitting ? "Memproses..." : "Lewati AI (Template Standar)"}
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span>Susun Layout dengan AI</span>
               </Button>
 
               <Button type="submit" variant="primary" size="lg" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <Sparkles className="w-4 h-4 text-amber-300" />
-                )}
-                <span>{isSubmitting ? "Memproses..." : "Gunakan AI untuk Layout"}</span>
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenTool className="w-4 h-4" />}
+                <span>{isSubmitting ? "Memproses..." : "Buat Sampul dari Template"}</span>
                 {!isSubmitting && <ChevronRight className="w-4 h-4" />}
               </Button>
             </div>

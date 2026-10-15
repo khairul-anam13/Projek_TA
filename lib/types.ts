@@ -1,7 +1,12 @@
+/** Field data sekolah yang bisa "diikat" ke elemen teks (lihat lib/templates.ts). */
+export type SchoolFieldKey = "judulRapor" | "namaSekolah" | "alamatSekolah" | "subInformasi";
+
 export interface CanvasElement {
   id: string;
   type: "text" | "shape" | "logo" | "custom_svg" | "image";
   text?: string;
+  /** Jika diisi, teks elemen otomatis mengikuti `DesignProject.dynamicData[bind]`. */
+  bind?: SchoolFieldKey;
   shapeType?: "rectangle" | "circle" | "triangle" | "line";
   logoIcon?: string;
   customSvg?: string;
@@ -81,3 +86,5 @@ export interface DesignProject {
   };
   layoutType?: string;
 }
+
+export type PrintSize = NonNullable<DesignProject["printSize"]>;

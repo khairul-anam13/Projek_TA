@@ -60,7 +60,7 @@ export default function CreateResult() {
       audience: "Siswa",
       backgroundColor: "#111111",
       printMethod: "Embos Foil",
-      printSize: "Size A (23x34cm)",
+      printSize: formData.printSize ?? "Size A (23x34cm)",
       mockupType: formData.mockupType,
       dynamicData: formData.dynamicData,
       createdAt: new Date().toISOString(),

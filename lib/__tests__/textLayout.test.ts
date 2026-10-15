@@ -23,7 +23,7 @@ function makeMockCtx(charWidthFactor = 0.6) {
   } as unknown as CanvasRenderingContext2D;
 }
 
-/** Oracle independen: scan linear 1px demi 1px (algoritma LAMA sebelum dioptimasi jadi binary search di fitTextInBox). */
+/** Oracle independen: scan linear 1px demi 1px (bentuk LAMBAT dari aturan fitTextInBox; hasilnya harus sama dengan binary search). */
 function linearFit(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -37,7 +37,8 @@ function linearFit(
   while (true) {
     const lineHeight = fontSize * 1.35;
     const lines = wrapTextToLines(ctx, text, box.width, fontSize, fontFamily, fontWeight);
-    if (lines.length * lineHeight <= box.height || fontSize <= MIN_FONT_SIZE) {
+    const truncated = !text.includes("…") && lines.some((l) => l.endsWith("…"));
+    if ((!truncated && lines.length * lineHeight <= box.height) || fontSize <= MIN_FONT_SIZE) {
       return { lines, fontSize };
     }
     fontSize -= 1;
@@ -127,4 +128,28 @@ describe("fitTextInBox: shrink binary search menghasilkan hasil IDENTIK dengan l
       expect(actual.lines).toEqual(expected.lines);
     });
   }
+});
+
+describe("fitTextInBox: kata tunggal terlalu lebar mengecil sampai utuh, bukan dipotong '…'", () => {
+  it("memilih ukuran terbesar yang memuat kata penuh bila masih di atas ukuran minimum", () => {
+    const ctx = makeMockCtx(); // lebar = karakter * fontSize * 0.6
+    const word = "KARANGANYAR"; // 11 karakter
+    const r = fitTextInBox(ctx, word, { x: 0, y: 0, width: 400, height: 300 }, 100, "Times New Roman", "bold");
+    expect(r.lines).toEqual([word]);
+    expect(r.fontSize).toBeLessThanOrEqual(60); // 11 * 0.6 * s <= 400
+    expect(r.fontSize).toBeGreaterThanOrEqual(59);
+  });
+
+  it("tetap memotong dengan '…' hanya bila bahkan ukuran minimum tidak muat", () => {
+    const ctx = makeMockCtx();
+    const r = fitTextInBox(ctx, "Supercalifragilisticexpialidocious", { x: 0, y: 0, width: 40, height: 100 }, 50, "Times New Roman", "bold");
+    expect(r.fontSize).toBe(6);
+    expect(r.lines[0].endsWith("…")).toBe(true);
+  });
+
+  it("teks yang memang memuat '…' dari pengguna tidak dianggap terpotong", () => {
+    const ctx = makeMockCtx();
+    const r = fitTextInBox(ctx, "Tunggu…", { x: 0, y: 0, width: 500, height: 100 }, 40, "Times New Roman", "bold");
+    expect(r.fontSize).toBe(40);
+  });
 });

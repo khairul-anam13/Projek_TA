@@ -1,192 +1,23 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { DesignProject } from "../lib/types";
-import { Download, FileText, RotateCcw } from "lucide-react";
+import { Download, FileText, FileCode2, RotateCcw, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { Button, PageHeader } from "@/components/ui";
 import jsPDF from "jspdf";
 import { drawTextInBox, scaledInitialFontSize } from "../lib/textLayout";
-import {
-  materialTextureSvgString,
-  MATERIAL_TEXTURE_OPACITY,
-  MATERIAL_TEXTURE_BLEND_MODE,
-  MATERIAL_TEXTURE_BASE_FREQUENCY,
-  MATERIAL_TEXTURE_NUM_OCTAVES,
-  MATERIAL_TEXTURE_COLOR_MATRIX_VALUES,
-} from "../lib/materialTexture";
-import CanvasFitText from "./CanvasFitText";
+import { materialTextureSvgString, MATERIAL_TEXTURE_OPACITY, MATERIAL_TEXTURE_BLEND_MODE } from "../lib/materialTexture";
+import { getMikaRect, getPrintSizeCm } from "../lib/canvasConstraints";
+import { logoIconMarkup } from "../lib/logoIcons";
+import { customSvgMarkup } from "../lib/svgUtils";
+import { runPreflight, preflightSummary } from "../lib/preflight";
+import { buildScene, sceneToPdf, sceneToSvg } from "../lib/vectorExport";
+import { DesignCanvas } from "./DesignCanvas";
 
 interface PreviewPageProps {
   project: DesignProject;
   onBackToEditor: () => void;
-}
-
-/** Render satu elemen SVG dari data CanvasElement */
-function SvgElement({
-  el,
-  canvasWidthPx,
-  canvasHeightPx,
-}: {
-  el: DesignProject["elements"][number];
-  canvasWidthPx: number;
-  canvasHeightPx: number;
-}) {
-  const ex = `${el.x}%`;
-  const ey = `${el.y}%`;
-  const ew = `${el.width}%`;
-  const eh = `${el.height}%`;
-
-  if (el.type === "shape") {
-    if (el.shapeType === "rectangle") {
-      return <rect x={ex} y={ey} width={ew} height={eh} fill={el.color || "#cccccc"} />;
-    }
-    if (el.shapeType === "circle") {
-      return (
-        <ellipse
-          cx={`${el.x + el.width / 2}%`}
-          cy={`${el.y + el.height / 2}%`}
-          rx={`${el.width / 2}%`}
-          ry={`${el.height / 2}%`}
-          fill={el.color || "#cccccc"}
-        />
-      );
-    }
-    if (el.shapeType === "line") {
-      return (
-        <line
-          x1={ex} y1={ey}
-          x2={`${el.x + el.width}%`} y2={ey}
-          stroke={el.color || "#000"}
-          strokeWidth={el.height || 2}
-        />
-      );
-    }
-  }
-
-  if (el.type === "logo") {
-    const iconPaths: Record<string, React.ReactNode> = {
-      sparkles: (
-        <path fill={el.color || "#000"} d="M50,0 L57,37 L94,44 L57,51 L50,88 L43,51 L6,44 L43,37 Z M25,12 L28,21 L37,23 L28,25 L25,34 L22,25 L13,23 L22,21 Z" />
-      ),
-      mortarboard: (
-        <g fill={el.color || "#000"}>
-          <polygon points="50,15 90,35 50,55 10,35" />
-          <polygon points="25,48 25,75 50,88 75,75 75,48 50,60" />
-          <polygon points="85,35 85,65 89,68 89,37" />
-        </g>
-      ),
-      shield: (
-        <path fill={el.color || "#000"} d="M50,10 C70,10 85,18 85,18 C85,18 85,55 50,85 C15,55 15,18 15,18 C15,18 30,10 50,10 Z" />
-      ),
-      leaf: (
-        <path fill={el.color || "#000"} d="M15,90 C15,90 35,40 85,15 C85,15 80,50 50,75 C30,92 15,90 15,90 Z" />
-      ),
-      building: (
-        <path fill={el.color || "#000"} stroke={el.color || "#000"} strokeWidth="4" strokeLinecap="round" d="M10,90 L90,90 M20,90 L20,30 L50,10 L80,30 L80,90 M30,40 L40,40 M30,55 L40,55 M60,40 L70,40 M60,55 L70,55" />
-      ),
-    };
-    return (
-      <svg x={ex} y={ey} width={ew} height={eh} viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-        {iconPaths[el.logoIcon ?? ""] ?? <circle cx="50" cy="50" r="40" fill={el.color || "#000"} />}
-      </svg>
-    );
-  }
-
-  if (el.type === "text") {
-    if (!el.text || el.text.trim() === "") return null;
-    return (
-      <CanvasFitText
-        el={el}
-        boxWidthPx={(el.width / 100) * canvasWidthPx}
-        boxHeightPx={(el.height / 100) * canvasHeightPx}
-        canvasWidthPx={canvasWidthPx}
-      />
-    );
-  }
-
-
-  if (el.type === "custom_svg" && el.customSvg) {
-    return (
-      <g dangerouslySetInnerHTML={{ 
-        __html: el.customSvg
-          .replace(/fill="[^"]*"/g, `fill="${el.color || '#000000'}"`)
-          .replace(/<svg([^>]*)>/, (match, p1) => {
-            let attrs = p1.replace(/\s(x|y|width|height)="[^"]*"/g, '');
-            if (!attrs.includes("preserveAspectRatio")) {
-              attrs += ' preserveAspectRatio="xMidYMid meet"';
-            }
-            return `<svg x="${el.x}%" y="${el.y}%" width="${el.width}%" height="${el.height}%" ${attrs} overflow="visible">`;
-          })
-      }} />
-    );
-  }
-
-  if (el.type === "image" && el.imageUrl) {
-    return (
-      <image x={ex} y={ey} width={ew} height={eh} href={el.imageUrl} preserveAspectRatio="none" />
-    );
-  }
-
-  return null;
-}
-
-/** Kanvas desain SVG yang bisa digunakan di flat dan 3D view */
-function DesignCanvas({ project, width, height, borderRadius = 8 }: {
-  project: DesignProject;
-  width: number;
-  height: number;
-  borderRadius?: number;
-}) {
-  const sorted = [...project.elements].sort((a, b) => a.zIndex - b.zIndex);
-  const isSizeB = project.printSize === "Size B (17x23cm)";
-  return (
-    <div
-      style={{
-        width,
-        height,
-        borderRadius,
-        backgroundColor: project.materialColor || project.backgroundColor || "#ffffff",
-        overflow: "hidden",
-        position: "relative",
-      }}
-    >
-      {/* Subtle gloss overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none z-10"
-        style={{
-          background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 55%, rgba(0,0,0,0.04) 100%)",
-        }}
-      />
-      
-      {/* Tekstur Bahan SVG Overlay (parameter sinkron dengan lib/materialTexture.ts, dipakai juga oleh pipeline ekspor) */}
-      <svg
-        className="absolute inset-0 pointer-events-none w-full h-full"
-        style={{ zIndex: 11, opacity: MATERIAL_TEXTURE_OPACITY, mixBlendMode: MATERIAL_TEXTURE_BLEND_MODE }}
-      >
-        <filter id="leather-texture-preview">
-          <feTurbulence type="fractalNoise" baseFrequency={MATERIAL_TEXTURE_BASE_FREQUENCY} numOctaves={MATERIAL_TEXTURE_NUM_OCTAVES} result="noise" />
-          <feColorMatrix type="matrix" values={MATERIAL_TEXTURE_COLOR_MATRIX_VALUES} />
-        </filter>
-        <rect width="100%" height="100%" filter="url(#leather-texture-preview)" />
-      </svg>
-
-      <svg className="absolute inset-0 w-full h-full" aria-hidden="true" style={{zIndex: 20}}>
-        {sorted.map((el) => (
-          <SvgElement key={el.id} el={el} canvasWidthPx={width} canvasHeightPx={height} />
-        ))}
-        <image
-          href="/mika-nama.png"
-          x={isSizeB ? '11.76%' : '21.73%'}
-          y={isSizeB ? '50%' : '66.17%'}
-          width={isSizeB ? '76.47%' : '56.52%'}
-          height={isSizeB ? '19.56%' : '13.23%'}
-          preserveAspectRatio="none"
-          pointerEvents="none"
-        />
-      </svg>
-    </div>
-  );
 }
 
 /** 3D card yang bisa digerakkan dengan mouse / sentuhan */
@@ -400,36 +231,15 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
           img.onerror = () => resolve();
           img.src = el.imageUrl!;
         });
-      } else if (el.type === "custom_svg" && el.customSvg) {
-        let str = el.customSvg.replace(/fill="[^"]*"/g, `fill="${el.color || '#000000'}"`);
-        str = str.replace(/<svg([^>]*)>/, (match, p1) => {
-          let attrs = p1.replace(/\s(x|y|width|height)="[^"]*"/g, '');
-          if (!attrs.includes("preserveAspectRatio")) {
-            attrs += ' preserveAspectRatio="xMidYMid meet"';
-          }
-          return `<svg width="${drawW}" height="${drawH}" ${attrs}>`;
-        });
-
-        await new Promise<void>((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            ctx.drawImage(img, drawX, drawY, drawW, drawH);
-            resolve();
-          };
-          img.onerror = () => resolve();
-          img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(str)}`;
-        });
-      } else if (el.type === "logo") {
-        const c = el.color || "#000";
-        const iconSvgContent: Record<string, string> = {
-          sparkles: `<path fill="${c}" d="M50,0 L57,37 L94,44 L57,51 L50,88 L43,51 L6,44 L43,37 Z M25,12 L28,21 L37,23 L28,25 L25,34 L22,25 L13,23 L22,21 Z"/>`,
-          mortarboard: `<g fill="${c}"><polygon points="50,15 90,35 50,55 10,35"/><polygon points="25,48 25,75 50,88 75,75 75,48 50,60"/><polygon points="85,35 85,65 89,68 89,37"/></g>`,
-          shield: `<path fill="${c}" d="M50,10 C70,10 85,18 85,18 C85,18 85,55 50,85 C15,55 15,18 15,18 C15,18 30,10 50,10 Z"/>`,
-          leaf: `<path fill="${c}" d="M15,90 C15,90 35,40 85,15 C85,15 80,50 50,75 C30,92 15,90 15,90 Z"/>`,
-          building: `<path fill="${c}" stroke="${c}" stroke-width="4" stroke-linecap="round" d="M10,90 L90,90 M20,90 L20,30 L50,10 L80,30 L80,90 M30,40 L40,40 M30,55 L40,55 M60,40 L70,40 M60,55 L70,55"/>`,
-        };
-        const inner = iconSvgContent[el.logoIcon ?? ""] ?? `<circle cx="50" cy="50" r="40" fill="${c}"/>`;
-        const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${drawW}" height="${drawH}" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">${inner}</svg>`;
+      } else if ((el.type === "custom_svg" && el.customSvg) || el.type === "logo") {
+        const svgStr =
+          el.type === "logo"
+            ? `<svg xmlns="http://www.w3.org/2000/svg" width="${drawW}" height="${drawH}" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">${logoIconMarkup(el.logoIcon, el.color || "#000")}</svg>`
+            : customSvgMarkup(
+                el.customSvg!,
+                el.color || "#000000",
+                `xmlns="http://www.w3.org/2000/svg" width="${drawW}" height="${drawH}"`
+              );
 
         await new Promise<void>((resolve) => {
           const img = new Image();
@@ -448,11 +258,14 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
     await new Promise<void>((resolve) => {
       const mikaImg = new Image();
       mikaImg.onload = () => {
-        const mx = (isSizeB ? 11.76 : 21.73) / 100 * canvasW;
-        const my = (isSizeB ? 50 : 66.17) / 100 * canvasH;
-        const mw = (isSizeB ? 76.47 : 56.52) / 100 * canvasW;
-        const mh = (isSizeB ? 19.56 : 13.23) / 100 * canvasH;
-        ctx.drawImage(mikaImg, mx, my, mw, mh);
+        const mika = getMikaRect(project.printSize);
+        ctx.drawImage(
+          mikaImg,
+          (mika.x / 100) * canvasW,
+          (mika.y / 100) * canvasH,
+          (mika.width / 100) * canvasW,
+          (mika.height / 100) * canvasH
+        );
         resolve();
       };
       mikaImg.onerror = () => resolve();
@@ -482,6 +295,29 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
       pdf.save(`${fileBaseName}.pdf`);
     }
   };
+
+  /** Ekspor artwork vektor (tanpa bahan & mika) dalam ukuran fisik asli untuk klise. */
+  const exportVector = (format: "svg" | "pdf") => {
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!ctx) return;
+    const scene = buildScene(project, ctx);
+    const fileBase = `PageFree-${project.name.replace(/\s+/g, "_")}-Artwork`;
+
+    if (format === "pdf") {
+      sceneToPdf(scene, project.name).save(`${fileBase}.pdf`);
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([sceneToSvg(scene)], { type: "image/svg+xml" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${fileBase}.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const issues = useMemo(() => runPreflight(project), [project]);
+  const summary = preflightSummary(issues);
+  const { width: sizeWCm, height: sizeHCm } = getPrintSizeCm(project.printSize);
 
   const isSizeB = project.printSize === "Size B (17x23cm)";
   const ratio = isSizeB ? (17 / 23) : (23 / 34);
@@ -576,16 +412,65 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
                 Spesifikasi Cetak
               </h3>
               {[
-                ["Ukuran", project.printSize || "Size A (23x34cm)"],
+                ["Ukuran", `${project.printSize || "Size A (23x34cm)"} · ${sizeWCm * 10}×${sizeHCm * 10} mm`],
                 ["Jenis Kertas", "Bahan Sintetis (ASE)"],
                 ["Metode Cetak", project.printMethod || "Embos Foil"],
-                ["Konsep", project.concept],
+                ["Layout", project.layoutType || "-"],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between items-center text-xs">
                   <span className="text-stone-400">{label}</span>
                   <span className="text-stone-700 font-semibold text-right max-w-[55%]">{value}</span>
                 </div>
               ))}
+            </div>
+
+            {/* Cek siap cetak */}
+            <div
+              id="preflight-card"
+              className={`p-4 rounded-lg border space-y-2 ${
+                summary.errors > 0
+                  ? "bg-rose-50 border-rose-200"
+                  : summary.warnings > 0
+                    ? "bg-amber-50 border-amber-200"
+                    : "bg-emerald-50 border-emerald-200"
+              }`}
+            >
+              <p className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
+                {summary.errors > 0 ? (
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                ) : summary.warnings > 0 ? (
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                )}
+                {summary.errors > 0
+                  ? `${summary.errors} masalah harus diperbaiki`
+                  : summary.warnings > 0
+                    ? `${summary.warnings} hal perlu dicek`
+                    : "Siap cetak"}
+              </p>
+              {issues.length > 0 && (
+                <ul className="space-y-1.5">
+                  {issues.slice(0, 6).map((issue, i) => (
+                    <li key={i} className="flex gap-1.5 text-[11px] leading-snug text-stone-700">
+                      <span
+                        className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${
+                          issue.severity === "error" ? "bg-rose-500" : "bg-amber-500"
+                        }`}
+                      />
+                      <span>{issue.message}</span>
+                    </li>
+                  ))}
+                  {issues.length > 6 && (
+                    <li className="text-[11px] text-stone-500">dan {issues.length - 6} temuan lain.</li>
+                  )}
+                </ul>
+              )}
+              {issues.length === 0 && (
+                <p className="text-[11px] text-stone-600">
+                  Tidak ada teks di jendela mika, warna sesuai metode cetak, dan semua elemen di dalam margin aman.
+                </p>
+              )}
             </div>
 
             {/* AI Slogan */}
@@ -635,14 +520,34 @@ export default function PreviewPage({ project, onBackToEditor }: PreviewPageProp
 
           {/* Download Actions */}
           <div className="p-5 border-t border-stone-100 space-y-2.5">
-            <Button variant="primary" size="lg" className="w-full rounded-lg shadow-none bg-foil-bright text-ink hover:bg-foil active:bg-foil" onClick={() => generateHighResFile("png")}>
-              <Download className="w-4 h-4" />
-              <span>Unduh PNG (Resolusi Tinggi)</span>
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full rounded-lg shadow-none bg-foil-bright text-ink hover:bg-foil active:bg-foil"
+              onClick={() => exportVector("pdf")}
+              title="Artwork vektor ukuran asli, tanpa bahan & mika — untuk pembuatan klise"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Unduh PDF Vektor</span>
             </Button>
-            <Button variant="secondary" size="lg" className="w-full" onClick={() => generateHighResFile("pdf")}>
-              <FileText className="w-4 h-4 text-rose-400" />
-              <span>Simpan sebagai PDF</span>
+            <Button variant="secondary" size="lg" className="w-full" onClick={() => exportVector("svg")}>
+              <FileCode2 className="w-4 h-4 text-stone-500" />
+              <span>Unduh SVG Vektor</span>
             </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="secondary" size="sm" onClick={() => generateHighResFile("png")}>
+                <Download className="w-3.5 h-3.5" />
+                <span>PNG pratinjau</span>
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => generateHighResFile("pdf")}>
+                <FileText className="w-3.5 h-3.5 text-rose-400" />
+                <span>PDF pratinjau</span>
+              </Button>
+            </div>
+            <p className="text-[10px] leading-snug text-stone-400">
+              File vektor berisi artwork saja (teks masih berupa teks Times/Arial; ubah ke kurva di CorelDRAW sebelum
+              membuat klise). File pratinjau berupa gambar raster berisi bahan dan mika.
+            </p>
             <Button variant="ghost" size="md" className="w-full" onClick={onBackToEditor}>
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Kembali Edit Desain</span>

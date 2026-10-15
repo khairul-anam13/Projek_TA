@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { CanvasElement, DesignProject } from "../lib/types";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { CanvasElement, DesignProject, SchoolFieldKey } from "../lib/types";
 import CanvasFitText from "./CanvasFitText";
 import {
   clampToCanvas,
@@ -12,8 +12,13 @@ import {
   getCardRatio,
   computeImageImportSize,
   computeResize,
+  getMikaRect,
+  getMikaZone,
   ResizeHandle,
 } from "../lib/canvasConstraints";
+import { logoIconMarkup, LOGO_ICON_NAMES } from "../lib/logoIcons";
+import { customSvgMarkup } from "../lib/svgUtils";
+import { SCHOOL_FIELDS, applyBindings, deriveSchoolData, withInferredBindings } from "../lib/templates";
 import {
   MATERIAL_TEXTURE_OPACITY,
   MATERIAL_TEXTURE_BLEND_MODE,
@@ -39,6 +44,7 @@ import {
   AlignRight,
   Bold,
   Minus,
+  School,
   Grid,
   MousePointer2,
   Circle,
@@ -55,7 +61,7 @@ import {
 } from "lucide-react";
 import ImageToVectorConverter from "./ImageToVectorConverter";
 import { Button, IconButton } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { cn, generateId } from "@/lib/utils";
 
 interface EditorPageProps {
   project: DesignProject;
@@ -79,6 +85,14 @@ const PRESET_FONTS = [
   { name: "Times New Roman", label: "Times New Roman (Serif Utama)" },
   { name: "Arial", label: "Arial (Tebal / Sans-Serif)" },
 ];
+
+const LOGO_LABELS: Record<(typeof LOGO_ICON_NAMES)[number], string> = {
+  mortarboard: "Toga",
+  shield: "Perisai",
+  sparkles: "Bintang",
+  leaf: "Daun",
+  building: "Gedung",
+};
 
 const MATERIAL_COLORS = [
   { name: "Maroon", hex: "#800000" },
@@ -104,38 +118,20 @@ function clampZoom(z: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 }
 
-function generateId(prefix: string): string {
-  return `${prefix}_${Math.random().toString(36).substring(2, 9)}`;
-}
-
-function renderLogoSvg(icon: string, color: string) {
-  switch (icon) {
-    case "sparkles":
-      return <path fill={color} d="M50,0 L57,37 L94,44 L57,51 L50,88 L43,51 L6,44 L43,37 Z M25,12 L28,21 L37,23 L28,25 L25,34 L22,25 L13,23 L22,21 Z" />;
-    case "mortarboard":
-      return <g fill={color}><polygon points="50,15 90,35 50,55 10,35" /><polygon points="25,48 25,75 50,88 75,75 75,48 50,60" /><polygon points="85,35 85,65 89,68 89,37" /></g>;
-    case "shield":
-      return <path fill={color} d="M50,10 C70,10 85,18 85,18 C85,18 85,55 50,85 C15,55 15,18 15,18 C15,18 30,10 50,10 Z" />;
-    case "leaf":
-      return <path fill={color} d="M15,90 C15,90 35,40 85,15 C85,15 80,50 50,75 C30,92 15,90 15,90 Z" />;
-    case "building":
-      return <path fill={color} stroke={color} strokeWidth="4" strokeLinecap="round" d="M10,90 L90,90 M20,90 L20,30 L50,10 L80,30 L80,90 M30,40 L40,40 M30,55 L40,55 M60,40 L70,40 M60,55 L70,55" />;
-    default:
-      return <circle cx="50" cy="50" r="40" fill={color} />;
-  }
-}
-
 export default function EditorPage({
   project: initialProject,
   onBackToDashboard,
   onSaveProject,
   onExport,
 }: EditorPageProps) {
-  const [project, setProject] = useState<DesignProject>(initialProject);
+  const [project, setProject] = useState<DesignProject>(() => {
+    const elements = withInferredBindings(initialProject.elements);
+    return { ...initialProject, elements, dynamicData: deriveSchoolData(elements, initialProject.dynamicData) };
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [history, setHistory] = useState<CanvasElement[][]>([initialProject.elements]);
+  const [history, setHistory] = useState<CanvasElement[][]>(() => [withInferredBindings(initialProject.elements)]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [activeGuides, setActiveGuides] = useState<{ type: "v" | "h"; value: number }[]>([]);
@@ -166,6 +162,13 @@ export default function EditorPage({
   useEffect(() => {
     elementsRef.current = project.elements;
   }, [project.elements]);
+
+  // Zona mika sesuai ukuran cetak (Size A & B berbeda); ref untuk listener window.
+  const mikaZone = useMemo(() => getMikaZone(project.printSize), [project.printSize]);
+  const mikaZoneRef = useRef(mikaZone);
+  useEffect(() => {
+    mikaZoneRef.current = mikaZone;
+  }, [mikaZone]);
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -226,6 +229,15 @@ export default function EditorPage({
     updateElement(id, { [key]: parsed } as Partial<CanvasElement>);
   }, [updateElement]);
 
+  // Ubah satu field data sekolah: semua elemen teks yang terikat ikut berubah.
+  // Riwayat undo dicatat saat input kehilangan fokus (commitHistory).
+  const setSchoolField = useCallback((key: SchoolFieldKey, value: string) => {
+    setProject((p) => {
+      const dynamicData = { ...(p.dynamicData ?? {}), [key]: value };
+      return { ...p, dynamicData, elements: applyBindings(p.elements, dynamicData) };
+    });
+  }, []);
+
   const addElement = useCallback((type: "text" | "shape" | "logo" | "custom_svg" | "image", props: Partial<CanvasElement>) => {
     const id = generateId("el");
     const zIndex = Math.max(0, ...project.elements.map((e) => e.zIndex)) + 1;
@@ -271,13 +283,13 @@ export default function EditorPage({
     // Elemen terkunci-X tetap harus rata tengah, bukan ikut digeser +5 —
     // dan hasil geser Y tidak boleh mendarat di Zona Mika (Y 50-80).
     const newX = el.isLockedX ? el.x : Math.min(el.x + 5, 80);
-    const newY = enforceMikaConstraint(el.type, Math.min(el.y + 5, 80));
+    const newY = enforceMikaConstraint(el.type, Math.min(el.y + 5, 80), el.height, mikaZone);
     const dup: CanvasElement = { ...el, id: newId, x: newX, y: newY, zIndex: newZ };
     const next = [...project.elements, dup];
     setProject((p) => ({ ...p, elements: next }));
     setSelectedId(newId);
     pushHistory(next);
-  }, [selectedId, project.elements, pushHistory]);
+  }, [selectedId, project.elements, pushHistory, mikaZone]);
 
   const changeLayer = useCallback((dir: "front" | "back") => {
     if (!selectedId) return;
@@ -442,7 +454,7 @@ export default function EditorPage({
       ty = snapped.y;
 
       // Constraint Zona Mika: elemen teks tidak boleh di Y 50-80
-      ty = enforceMikaConstraint(elTypeObj?.type, ty);
+      ty = enforceMikaConstraint(elTypeObj?.type, ty, elTypeObj?.height ?? 0, mikaZoneRef.current);
 
       setActiveGuides(snapped.guides);
       setProject((p) => ({
@@ -543,8 +555,8 @@ export default function EditorPage({
       const el = project.elements.find((x) => x.id === selectedId);
       const step = e.shiftKey ? 5 : 1;
       const move: Record<string, Partial<CanvasElement>> = {
-        ArrowUp: { y: enforceMikaConstraint(el?.type, Math.max(0, (el?.y ?? 0) - step)) },
-        ArrowDown: { y: enforceMikaConstraint(el?.type, Math.min(95, (el?.y ?? 0) + step)) },
+        ArrowUp: { y: enforceMikaConstraint(el?.type, Math.max(0, (el?.y ?? 0) - step), el?.height ?? 0, mikaZone) },
+        ArrowDown: { y: enforceMikaConstraint(el?.type, Math.min(95, (el?.y ?? 0) + step), el?.height ?? 0, mikaZone) },
       };
 
       if (!el?.isLockedX) {
@@ -556,12 +568,13 @@ export default function EditorPage({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, handleUndo, handleRedo, duplicateSelected, deleteSelected, updateElement, project.elements]);
+  }, [selectedId, handleUndo, handleRedo, duplicateSelected, deleteSelected, updateElement, project.elements, mikaZone]);
 
 
   const selectedEl = project.elements.find((e) => e.id === selectedId);
   const isSizeB = project.printSize === "Size B (17x23cm)";
   const ratio = isSizeB ? (17 / 23) : (23 / 34);
+  const mikaRect = getMikaRect(project.printSize);
   const canvasW = 400 * zoom;
   const canvasH = Math.round(canvasW / ratio);
 
@@ -789,9 +802,15 @@ export default function EditorPage({
                       <line x1={ex} y1={ey} x2={`${el.x + el.width}%`} y2={ey} stroke={el.color || "#000"} strokeWidth={el.height || 2} />
                     )}
                     {el.type === "logo" && (
-                      <svg x={ex} y={ey} width={ew} height={eh} viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-                        {renderLogoSvg(el.logoIcon || "sparkles", el.color || "#000")}
-                      </svg>
+                      <svg
+                        x={ex}
+                        y={ey}
+                        width={ew}
+                        height={eh}
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="xMidYMid meet"
+                        dangerouslySetInnerHTML={{ __html: logoIconMarkup(el.logoIcon || "sparkles", el.color || "#000") }}
+                      />
                     )}
                     {el.type === "text" && el.text && (
                       <CanvasFitText
@@ -802,17 +821,15 @@ export default function EditorPage({
                       />
                     )}
                     {el.type === "custom_svg" && el.customSvg && (
-                      <g dangerouslySetInnerHTML={{
-                        __html: el.customSvg
-                          .replace(/fill="[^"]*"/g, `fill="${el.color || '#000000'}"`)
-                          .replace(/<svg([^>]*)>/, (match, p1) => {
-                            let attrs = p1.replace(/\s(x|y|width|height)="[^"]*"/g, '');
-                            if (!attrs.includes("preserveAspectRatio")) {
-                              attrs += ' preserveAspectRatio="xMidYMid meet"';
-                            }
-                            return `<svg x="${el.x}%" y="${el.y}%" width="${el.width}%" height="${el.height}%" ${attrs} overflow="visible">`;
-                          })
-                      }} />
+                      <g
+                        dangerouslySetInnerHTML={{
+                          __html: customSvgMarkup(
+                            el.customSvg,
+                            el.color || "#000000",
+                            `x="${el.x}%" y="${el.y}%" width="${el.width}%" height="${el.height}%"`
+                          ),
+                        }}
+                      />
                     )}
                     {el.type === "image" && el.imageUrl && (
                       <image x={ex} y={ey} width={ew} height={eh} href={el.imageUrl} preserveAspectRatio="none" />
@@ -863,10 +880,10 @@ export default function EditorPage({
               {/* Mika Nama Overlay */}
               <image
                 href="/mika-nama.png"
-                x={isSizeB ? '11.76%' : '21.73%'}
-                y={isSizeB ? '50%' : '66.17%'}
-                width={isSizeB ? '76.47%' : '56.52%'}
-                height={isSizeB ? '19.56%' : '13.23%'}
+                x={`${mikaRect.x}%`}
+                y={`${mikaRect.y}%`}
+                width={`${mikaRect.width}%`}
+                height={`${mikaRect.height}%`}
                 preserveAspectRatio="none"
                 pointerEvents="none"
               />
@@ -916,6 +933,42 @@ export default function EditorPage({
             {/* TAB CONTENT: Properties */}
             {activeDocker === "properties" && (
               <>
+                {/* DATA SEKOLAH (WHEN NOTHING SELECTED) */}
+                {!selectedEl && (
+                  <div className="py-3">
+                    <p className="font-semibold text-stone-500 mb-3 flex items-center gap-1.5 text-[11px]">
+                      <School size={13}/> Data sekolah
+                    </p>
+                    <div className="space-y-2">
+                      {SCHOOL_FIELDS.map((f) => (
+                        <div key={f.key}>
+                          <label className="text-[10px] font-medium text-stone-400 mb-1 block">{f.label}</label>
+                          {f.multiline ? (
+                            <textarea
+                              rows={3}
+                              className={cn(fieldClass, "w-full resize-none")}
+                              value={project.dynamicData?.[f.key] ?? ""}
+                              onChange={(e) => setSchoolField(f.key, e.target.value)}
+                              onBlur={commitHistory}
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              className={cn(fieldClass, "w-full")}
+                              value={project.dynamicData?.[f.key] ?? ""}
+                              onChange={(e) => setSchoolField(f.key, e.target.value)}
+                              onBlur={commitHistory}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-stone-400 mt-2 leading-tight">
+                      Semua teks yang terikat ikut berubah otomatis. Judul dan nama sekolah selalu huruf kapital.
+                    </p>
+                  </div>
+                )}
+
                 {/* PROJECT MOCKUP SETTINGS (WHEN NOTHING SELECTED) */}
                 {!selectedEl && (
                   <div className="py-3">
@@ -1058,11 +1111,20 @@ export default function EditorPage({
                             type="text"
                             className={cn(fieldClass, "w-full")}
                             value={selectedEl.text || ""}
-                            onChange={(e) => updateElement(selectedId!, { text: e.target.value })}
+                            onChange={(e) =>
+                              selectedEl.bind
+                                ? setSchoolField(selectedEl.bind, e.target.value)
+                                : updateElement(selectedId!, { text: e.target.value })
+                            }
                             onBlur={commitHistory}
                             onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                             placeholder="Ketik teks..."
                           />
+                          {selectedEl.bind && (
+                            <p className="text-[10px] text-stone-400 leading-tight">
+                              Terikat ke data sekolah: berubah bersama semua teks dengan field yang sama.
+                            </p>
+                          )}
 
                           <div>
                             <label className="text-[10px] font-medium text-stone-400 mb-1 block">Ukuran font</label>
@@ -1184,16 +1246,14 @@ export default function EditorPage({
                 <div className="py-3">
                   <p className="font-semibold text-stone-500 mb-2 flex items-center gap-1.5 text-[11px]"><Sparkles size={13}/> Stamps & icons</p>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { icon: "mortarboard", label: "Toga" },
-                      { icon: "shield", label: "Perisai" },
-                      { icon: "sparkles", label: "Bintang" },
-                      { icon: "leaf", label: "Daun" },
-                      { icon: "building", label: "Gedung" },
-                    ].map(s => (
-                      <button key={s.icon} onClick={() => addElement('logo', {logoIcon: s.icon, width: 15, height: 15})} className="flex flex-col items-center p-2.5 border border-stone-200 hover:border-accent-300 hover:bg-accent-50/60 rounded-sm transition cursor-pointer">
-                        <svg className="w-6 h-6 fill-current text-stone-600 mb-1" viewBox="0 0 100 100">{renderLogoSvg(s.icon, "currentColor")}</svg>
-                        <span className="text-[10px] text-stone-500">{s.label}</span>
+                    {LOGO_ICON_NAMES.map((icon) => (
+                      <button key={icon} onClick={() => addElement('logo', {logoIcon: icon, width: 15, height: 15})} className="flex flex-col items-center p-2.5 border border-stone-200 hover:border-accent-300 hover:bg-accent-50/60 rounded-sm transition cursor-pointer">
+                        <svg
+                          className="w-6 h-6 fill-current text-stone-600 mb-1"
+                          viewBox="0 0 100 100"
+                          dangerouslySetInnerHTML={{ __html: logoIconMarkup(icon, "currentColor") }}
+                        />
+                        <span className="text-[10px] text-stone-500">{LOGO_LABELS[icon]}</span>
                       </button>
                     ))}
                   </div>
@@ -1210,7 +1270,12 @@ export default function EditorPage({
         <ImageToVectorConverter
           onClose={() => setShowVectorConverter(false)}
           onInsertSVG={(svgString) => {
-            addElement('custom_svg', { customSvg: svgString, color: '#000000', width: 30, height: 30 });
+            addElement('custom_svg', {
+              customSvg: svgString,
+              color: project.printMethod === "Sablon" ? "#111111" : "#D4AF37",
+              width: 30,
+              height: 30,
+            });
           }}
         />
       )}

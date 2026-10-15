@@ -23,6 +23,7 @@ export function getMockupTemplate(mockupType: string, dynamicData: Record<string
         {
             id: `el_title_${Date.now()}`,
             type: "text",
+            bind: "judulRapor",
             text: judulRapor.toUpperCase(),
             x: 10, y: 5, width: 80, height: 10,
             fontSize: 43,
@@ -45,6 +46,7 @@ export function getMockupTemplate(mockupType: string, dynamicData: Record<string
         {
             id: `el_school_${Date.now()}`,
             type: "text",
+            bind: "namaSekolah",
             text: namaSekolah.toUpperCase(),
             x: 10, y: 30, width: 80, height: 9,
             fontSize: 33,
@@ -58,6 +60,7 @@ export function getMockupTemplate(mockupType: string, dynamicData: Record<string
         {
             id: `el_address_${Date.now()}`,
             type: "text",
+            bind: "alamatSekolah",
             text: alamatSekolah,
             x: 10, y: 41, width: 80, height: 7,
             fontSize: 23,
@@ -71,6 +74,7 @@ export function getMockupTemplate(mockupType: string, dynamicData: Record<string
         {
             id: `el_subinfo_${Date.now()}`,
             type: "text",
+            bind: "subInformasi",
             text: subInformasi,
             x: 10, y: 83, width: 80, height: 9,
             fontSize: 13,

@@ -1,11 +1,79 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import PreviewPage from "@/components/PreviewPage";
 import EditorPage from "@/components/EditorPage";
+import CreateProjectPage from "@/components/CreateProjectPage";
 import { getMockupTemplate } from "@/lib/mockupTemplates";
 import { drawTextInBox } from "@/lib/textLayout";
-import { DesignProject } from "@/lib/types";
+import { DesignProject, PrintSize } from "@/lib/types";
+import { COVER_TEMPLATES, buildTemplatePreviewProject } from "@/lib/templates";
+import { buildScene, sceneToSvg } from "@/lib/vectorExport";
+import { DesignCanvas } from "@/components/DesignCanvas";
+import { getCardRatio } from "@/lib/canvasConstraints";
+
+const QA_SIZES: PrintSize[] = ["Size A (23x34cm)", "Size B (17x23cm)"];
+const QA_DATA = {
+  judulRapor: "Rapor Peserta Didik",
+  namaSekolah: "SMKN 2 Karanganyar",
+  alamatSekolah:
+    "Jl. Yos Sudarso, Kayangan, Bejen, Kec. Karanganyar, Kabupaten Karanganyar, Jawa Tengah, 57716",
+  subInformasi: "NPSN: 20312071 | Bentuk Pendidikan: SMK | Status: Negeri",
+};
+
+/** QA visual: semua template x ukuran; kiri = pratinjau SVG di app, kanan = hasil ekspor vektor (SVG). */
+function TemplateQa() {
+  // Dirender hanya setelah QaPage ter-mount di browser (gate `mounted`), jadi aman memakai canvas.
+  const svgs = useMemo(() => {
+    const ctx = document.createElement("canvas").getContext("2d");
+    const out: Record<string, string> = {};
+    if (!ctx) return out;
+    for (const t of COVER_TEMPLATES) {
+      for (const size of QA_SIZES) {
+        const project = buildTemplatePreviewProject(t.id, { data: QA_DATA, mockupType: "Rapor SMA/SMK", printSize: size });
+        out[`${t.id}|${size}`] = sceneToSvg(buildScene(project, ctx));
+      }
+    }
+    return out;
+  }, []);
+
+  const W = 150;
+  return (
+    <div id="template-qa" style={{ padding: 24, borderBottom: "1px solid #ccc" }}>
+      <h2 style={{ margin: "0 0 12px" }}>Template x ukuran (kiri: pratinjau app, kanan: ekspor vektor)</h2>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+        {COVER_TEMPLATES.map((t) =>
+          QA_SIZES.map((size) => {
+            const project = buildTemplatePreviewProject(t.id, { data: QA_DATA, mockupType: "Rapor SMA/SMK", printSize: size });
+            const h = Math.round(W / getCardRatio(size));
+            const svg = svgs[`${t.id}|${size}`];
+            return (
+              <div key={`${t.id}|${size}`} data-qa={`${t.id}|${size}`}>
+                <p style={{ margin: "0 0 4px", fontSize: 12 }}>
+                  {t.nama} · {size.split(" ")[1]}
+                </p>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <DesignCanvas project={project} width={W} height={h} borderRadius={2} />
+                  <div style={{ width: W, height: h, background: "#111111" }}>
+                    {svg && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        alt={`ekspor ${t.nama}`}
+                        width={W}
+                        height={h}
+                        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
 
 const longProject: DesignProject = {
   id: "qa-long",
@@ -99,6 +167,19 @@ export default function QaPage() {
 
   return (
     <div>
+      <TemplateQa />
+      <div id="create-qa" style={{ borderBottom: "1px solid #ccc" }}>
+        <CreateProjectPage
+          initialProductType="Sampul Rapor"
+          initialFormData={{
+            mockupType: "Rapor SMA/SMK",
+            dynamicData: QA_DATA,
+          }}
+          onBack={() => {}}
+          onSkipAi={async () => {}}
+          onGenerateAi={async () => {}}
+        />
+      </div>
       <div style={{ height: 700, borderBottom: "1px solid #ccc" }}>
         <h2 style={{ padding: "8px 12px", margin: 0, background: "#fff" }}>EditorPage (Figma-style chrome reskin)</h2>
         <div style={{ height: "calc(100% - 37px)" }}>

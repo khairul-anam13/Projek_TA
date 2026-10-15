@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAppContext } from "@/lib/appContext";
 import { generateId } from "@/lib/utils";
 import { getMockupTemplate } from "@/lib/mockupTemplates";
+import { buildTemplateElements, getTemplate } from "@/lib/templates";
 import CreateProjectPage from "@/components/CreateProjectPage";
 import { DesignProject } from "@/lib/types";
 
@@ -51,7 +52,13 @@ export default function Create() {
 
   const handleSkipAi = async (formData: any) => {
     const newProjId = generateId("p");
-    const elements = getMockupTemplate(formData.mockupType, formData.dynamicData);
+    const printSize = formData.printSize ?? "Size A (23x34cm)";
+    const template = getTemplate(formData.templateId);
+    const elements = buildTemplateElements(template.id, {
+      data: formData.dynamicData,
+      mockupType: formData.mockupType,
+      printSize,
+    });
 
     const newProjectItem: DesignProject = {
       id: newProjId,
@@ -62,12 +69,12 @@ export default function Create() {
       audience: "Siswa",
       backgroundColor: "#111111",
       printMethod: "Embos Foil",
-      printSize: "Size A (23x34cm)",
+      printSize,
       mockupType: formData.mockupType,
       dynamicData: formData.dynamicData,
       createdAt: new Date().toISOString(),
       status: "Draft",
-      layoutType: "Modern Center",
+      layoutType: template.nama,
       slogan: "",
       description: "",
       elements,
